@@ -30,6 +30,11 @@ export function sfxEvents(tl, env) {
     }
     if (s.kind === 'teaser') ev.push({ name: 'rise', at: s.start + 0.2, vol: 0.35 });
     if (s.kind === 'outro') ev.push({ name: 'ding', at: s.start + 0.15, vol: 0.4 });
+    if (s.kind === 'card') ev.push({ name: 'impact', at: s.start + 0.5, vol: 0.6 });
+    if (s.kind === 'legs') ev.push({ name: 'ding', at: s.start + 0.3, vol: 0.4 }, { name: 'ding', at: s.start + s.dur * 0.45, vol: 0.4 });
+    if (s.kind === 'calc') ev.push({ name: 'rise', at: s.start + 1.0, vol: 0.35 });
+    if (s.kind === 'outcomes') ev.push({ name: 'impact', at: s.start + 1.0, vol: 0.7 }, { name: 'ding', at: s.start + 1.0, vol: 0.5 });
+    if (s.kind === 'steps') ev.push({ name: 'ding', at: s.start + 0.3, vol: 0.35 });
   });
   return ev;
 }

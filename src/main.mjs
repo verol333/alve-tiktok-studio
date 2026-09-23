@@ -30,12 +30,13 @@ async function checks(file, tl, audio) {
 }
 
 // Images clés envoyées à la relecture visuelle.
-async function keyFrames(file, tl) {
+async function keyFrames(file, tl, type) {
   const by = (k) => tl.scenes.find((s) => s.kind === k), times = [];
-  const add = (s, off) => { if (s) times.push(Math.min(s.start + off, s.start + s.dur - 0.2)); };
-  add(by('hook'), 0.8); add(by('match'), 1.6); add(by('pick'), 2.0);
-  const c = by('combo'); if (c) add(c, c.dur - 0.3);
-  add(by('outro'), 1.5);
+  const add = (s, off) => { if (s) times.push(off < 0 ? s.start + s.dur + off : Math.min(s.start + off, s.start + s.dur - 0.2)); };
+  const plan = type === 'site'
+    ? [['hook', 0.8], ['card', 1.8], ['calc', 2.6], ['outcomes', -0.3], ['outro', 1.5]]
+    : [['hook', 0.8], ['match', 1.6], ['pick', 2.0], ['combo', -0.3], ['outro', 1.5]];
+  for (const [k, off] of plan) add(by(k), off);
   const out = [];
   for (const [i, t] of times.entries()) {
     const f = join(DIR, 'k' + i + '.jpg');
@@ -64,10 +65,16 @@ async function main() {
     style: Object.assign({ hook_style: 'slam', subtitle_style: 'pill' }, style),
     F: await loadFonts(DIR), total: tl.total, picks: job.picks, totalOdds: Number(job.total_odds) || 2,
     particles: makeParticles(), emoji: {}, logos: [],
+    type: job.video_type || 'prono', show: job.showcase || null, when: style.when || '', bookLogos: [],
+    hudSub: style.hud_sub || 'Analyse foot du jour', bgAlpha: job.video_type === 'site' ? 0.2 : 0.9,
   };
   if (!Array.isArray(env.style.transitions) || !env.style.transitions.length) env.style.transitions = ['zoom', 'slide', 'whip', 'flash'];
   env.bg = await loadImg(job.backgrounds[(style.background || 0) % job.backgrounds.length]);
   for (const p of job.picks) env.logos.push({ home: await loadImg(p.logo_home), away: await loadImg(p.logo_away) });
+  if (env.show) {
+    for (const l of env.show.legs) env.bookLogos.push(await loadImg(l.logo));
+    if (env.show.sport_emoji) env.emoji[env.show.sport_emoji] = await loadEmoji(env.show.sport_emoji);
+  }
   for (const s of job.scenes) if (s.emoji && !(s.emoji in env.emoji)) env.emoji[s.emoji] = await loadEmoji(s.emoji);
   console.log('Logos chargés : ' + env.logos.map((l) => (l.home ? 1 : 0) + (l.away ? 1 : 0)).join(',') + ' — durée ' + tl.total.toFixed(1) + ' s');
 
@@ -79,7 +86,7 @@ async function main() {
 
   const metrics = await checks(final, tl, audio);
   console.log('Contrôle technique OK', JSON.stringify(metrics));
-  const { review } = await api('review', { frames: await keyFrames(final, tl), metrics });
+  const { review } = await api('review', { frames: await keyFrames(final, tl, env.type), metrics });
   if (!review.ok) throw new Error('Relecture : ' + review.issues.join(' ; '));
   console.log('Relecture visuelle OK');
 

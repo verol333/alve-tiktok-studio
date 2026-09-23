@@ -1,4 +1,5 @@
 import { W, H, clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, fitSingle, drawWords, isHi, tc, shakeAt, seeded } from './draw.mjs';
+import { SITE_DRAW } from './site.mjs';
 
 const hhmm = (iso) => { try { return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Brazzaville' }).format(new Date(iso)); } catch (e) { return ''; } };
 
@@ -103,7 +104,7 @@ function match(ctx, env, sc, lt) {
   teamName(ctx, env, p.team_home, 280, 880); teamName(ctx, env, p.team_away, 800, 880);
   ctx.restore();
   const k = hhmm(p.kickoff_iso);
-  if (k) pill(ctx, env, "COUP D'ENVOI " + k, 1020, 30, easeOut(prog(lt, 0.7, 0.3)));
+  if (k) pill(ctx, env, (env.when === 'demain' ? 'DEMAIN · ' : "COUP D'ENVOI ") + k, 1020, 30, easeOut(prog(lt, 0.7, 0.3)));
   const s = prog(lt, 1.0, 0.35);
   if (p.probable_score && s > 0) {
     ctx.save(); ctx.globalAlpha = s;
@@ -169,7 +170,7 @@ export const comboRevealAt = (env) => 0.5 + 0.15 * env.picks.length;
 function combo(ctx, env, sc, lt) {
   const pal = env.pal, F = env.F, n = env.picks.length;
   ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0, 0.3));
-  tc(ctx, 'LE COMBINÉ DU JOUR', 540, 400, 58, F.black, '#FFFFFF', rgba(pal.a, 0.7)); ctx.restore();
+  tc(ctx, env.when === 'demain' ? 'LE COMBINÉ DE DEMAIN' : 'LE COMBINÉ DU JOUR', 540, 400, 58, F.black, '#FFFFFF', rgba(pal.a, 0.7)); ctx.restore();
   env.picks.forEach((p, i) => {
     const e = easeOut(prog(lt, 0.15 + 0.15 * i, 0.4)), y = 450 + i * 165, x = 80 + (1 - e) * 1000, L = env.logos[i] || {};
     ctx.save(); ctx.globalAlpha = e;
@@ -226,7 +227,7 @@ function outro(ctx, env, sc, lt) {
   rr(ctx, -380, -80, 760, 160, 80); ctx.fillStyle = pal.a; ctx.shadowColor = pal.a; ctx.shadowBlur = 50; ctx.fill(); ctx.shadowBlur = 0;
   tc(ctx, '+ ABONNE-TOI', 0, 26, 72, F.black, '#FFFFFF'); ctx.restore();
   ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0.3, 0.4));
-  tc(ctx, 'TON SCORE EXACT', 540, 740, 54, F.black, '#FFFFFF'); tc(ctx, 'EN COMMENTAIRE', 540, 810, 54, F.black, pal.hi);
+  tc(ctx, env.type === 'site' ? 'TA QUESTION' : 'TON SCORE EXACT', 540, 740, 54, F.black, '#FFFFFF'); tc(ctx, 'EN COMMENTAIRE', 540, 810, 54, F.black, pal.hi);
   ctx.restore();
   ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0.6, 0.4));
   tc(ctx, 'LIEN DANS LA BIO', 540, 940, 44, F.xb, 'rgba(255,255,255,0.85)');
@@ -240,7 +241,7 @@ function outro(ctx, env, sc, lt) {
   ctx.restore();
 }
 
-const DRAW = { hook, retention, match, pick, combo, teaser, outro };
+const DRAW = { hook, retention, match, pick, combo, teaser, outro, ...SITE_DRAW };
 
 function shakeOf(env, sc, lt) {
   if (sc.kind === 'match') return shakeAt(lt, 0.45, 16);

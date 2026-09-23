@@ -6,6 +6,7 @@ export const PALETTES = {
   sunset: { a: '#F97316', b: '#FDBA74', hi: '#FFFFFF', d1: '#170802', d2: '#3F1705' },
   ice: { a: '#06B6D4', b: '#67E8F9', hi: '#FDE047', d1: '#02111A', d2: '#083247' },
   crimson: { a: '#EF4444', b: '#FCA5A5', hi: '#FDE047', d1: '#170305', d2: '#420A12' },
+  stadium: { a: '#33D98E', b: '#818CF8', hi: '#F3C969', d1: '#0A0F1E', d2: '#1C2336' },
   gold: { a: '#F59E0B', b: '#FDE68A', hi: '#FFFFFF', d1: '#140C02', d2: '#3A2606' },
 };
 
@@ -24,7 +25,7 @@ export function drawBackground(ctx, env, t) {
     const z = 1.1 + 0.12 * (t / env.total);
     const k = Math.max(W / img.width, H / img.height) * z;
     const w = img.width * k, hh = img.height * k;
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = env.bgAlpha ?? 0.9;
     ctx.drawImage(img, (W - w) / 2 + Math.sin(t * 0.2) * 30, (H - hh) / 2 + Math.cos(t * 0.15) * 20, w, hh);
     ctx.globalAlpha = 1;
   }
@@ -60,7 +61,7 @@ export function drawHud(ctx, env, t) {
   font(ctx, 46, F.display); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#06101F'; ctx.fillText('AV', 96, 104);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   font(ctx, 36, F.black); ctx.fillStyle = '#FFFFFF'; ctx.fillText('AL VE CAPITAL', 158, 100);
-  font(ctx, 22, F.sb); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText('Analyse foot du jour', 158, 134);
+  font(ctx, 22, F.sb); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(env.hudSub || 'Analyse foot du jour', 158, 134);
   ctx.textAlign = 'center';
   font(ctx, 22, F.sb); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillText('18+  ·  Analyse, pas un conseil  ·  Joue responsable', 540, 205);
 }
