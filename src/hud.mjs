@@ -63,7 +63,6 @@ export function drawHud(ctx, env, t) {
   font(ctx, 22, F.sb); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText('Analyse foot du jour', 158, 134);
   ctx.textAlign = 'center';
   font(ctx, 22, F.sb); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillText('18+  ·  Analyse, pas un conseil  ·  Joue responsable', 540, 205);
-  font(ctx, 26, F.xb); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillText('alvecapital.fr', 540, 1470);
 }
 
 // Sous-titres karaoké style TikTok : 1 à 3 mots, le mot prononcé s'allume.
