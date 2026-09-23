@@ -1,0 +1,103 @@
+import { mkdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { api, download } from './api.mjs';
+import { run, duration } from './sh.mjs';
+import { loadFonts, loadImg, loadEmoji } from './assets.mjs';
+import { buildTimeline } from './timeline.mjs';
+import { PALETTES, makeParticles } from './hud.mjs';
+import { renderVideo } from './render.mjs';
+import { makeSfx, mixAudio, sfxEvents } from './audio.mjs';
+
+const DIR = '/tmp/studio';
+mkdirSync(DIR, { recursive: true });
+
+// Garde-fou technique : format, son, durée, taille — sinon rien n'est envoyé.
+async function checks(file, tl, audio) {
+  const { out } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration,size', '-of', 'json', file]);
+  const info = JSON.parse(out);
+  const v = info.streams.find((s) => s.codec_type === 'video'), a = info.streams.find((s) => s.codec_type === 'audio');
+  const dur = parseFloat(info.format.duration), size = parseInt(info.format.size, 10);
+  const vd = await run('ffmpeg', ['-i', audio, '-af', 'volumedetect', '-f', 'null', '-']);
+  const m = /mean_volume:\s*(-?[\d.]+)/.exec(vd.err), mean = m ? parseFloat(m[1]) : -99;
+  const problems = [];
+  if (!v || v.width !== 1080 || v.height !== 1920) problems.push('format image incorrect');
+  if (!a) problems.push('pas de son');
+  if (!(Math.abs(dur - tl.total) <= 1)) problems.push('durée incohérente');
+  if (size < 300000 || size > 60000000) problems.push('taille de fichier anormale');
+  if (mean < -40) problems.push('son trop faible');
+  if (problems.length) throw new Error('Contrôle technique : ' + problems.join(', '));
+  return { duration: Math.round(dur * 10) / 10, size, mean_volume: mean, scenes: tl.scenes.length };
+}
+
+// Images clés envoyées à la relecture visuelle.
+async function keyFrames(file, tl) {
+  const by = (k) => tl.scenes.find((s) => s.kind === k), times = [];
+  const add = (s, off) => { if (s) times.push(Math.min(s.start + off, s.start + s.dur - 0.2)); };
+  add(by('hook'), 0.8); add(by('match'), 1.6); add(by('pick'), 2.0);
+  const c = by('combo'); if (c) add(c, c.dur - 0.3);
+  add(by('outro'), 1.5);
+  const out = [];
+  for (const [i, t] of times.entries()) {
+    const f = join(DIR, 'k' + i + '.jpg');
+    await run('ffmpeg', ['-y', '-ss', t.toFixed(2), '-i', file, '-frames:v', '1', '-vf', 'scale=540:-2', '-q:v', '5', f]);
+    out.push(readFileSync(f).toString('base64'));
+  }
+  return out;
+}
+
+async function main() {
+  const { job } = await api('job');
+  const style = job.style || {};
+  console.log('Script du ' + job.day_date + ' : ' + job.scenes.length + ' scènes, palette ' + style.palette);
+  const voiceFiles = [], durs = [];
+  for (const [i, s] of job.scenes.entries()) {
+    const f = join(DIR, 'v' + i + '.mp3');
+    await download(s.audio_url, f);
+    const d = await duration(f);
+    if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
+    voiceFiles.push(f); durs.push(d);
+  }
+  const tl = buildTimeline(job.scenes, durs);
+  if (tl.total < 12 || tl.total > 90) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
+  const env = {
+    pal: PALETTES[style.palette] || PALETTES.emerald,
+    style: Object.assign({ hook_style: 'slam', subtitle_style: 'pill' }, style),
+    F: await loadFonts(DIR), total: tl.total, picks: job.picks, totalOdds: Number(job.total_odds) || 2,
+    particles: makeParticles(), emoji: {}, logos: [],
+  };
+  if (!Array.isArray(env.style.transitions) || !env.style.transitions.length) env.style.transitions = ['zoom', 'slide', 'whip', 'flash'];
+  env.bg = await loadImg(job.backgrounds[(style.background || 0) % job.backgrounds.length]);
+  for (const p of job.picks) env.logos.push({ home: await loadImg(p.logo_home), away: await loadImg(p.logo_away) });
+  for (const s of job.scenes) if (s.emoji && !(s.emoji in env.emoji)) env.emoji[s.emoji] = await loadEmoji(s.emoji);
+  console.log('Logos chargés : ' + env.logos.map((l) => (l.home ? 1 : 0) + (l.away ? 1 : 0)).join(',') + ' — durée ' + tl.total.toFixed(1) + ' s');
+
+  const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
+  await renderVideo(env, tl, video);
+  await makeSfx(DIR, tl.total);
+  await mixAudio(DIR, tl, voiceFiles, sfxEvents(tl, env), audio);
+  await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
+
+  const metrics = await checks(final, tl, audio);
+  console.log('Contrôle technique OK', JSON.stringify(metrics));
+  const { review } = await api('review', { frames: await keyFrames(final, tl), metrics });
+  if (!review.ok) throw new Error('Relecture : ' + review.issues.join(' ; '));
+  console.log('Relecture visuelle OK');
+
+  const size = statSync(final).size;
+  const init = await api('upload_init', { video_size: size });
+  if (init.dry_run) { console.log('Montage d’essai : aucun envoi'); await api('done'); return; }
+  const put = await fetch(init.upload_url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(size), 'Content-Range': 'bytes 0-' + (size - 1) + '/' + size },
+    body: readFileSync(final),
+  });
+  if (!put.ok) throw new Error('TikTok a refusé le fichier (' + put.status + ') ' + (await put.text()).slice(0, 200));
+  await api('done', { publish_id: init.publish_id });
+  console.log('Vidéo envoyée dans les brouillons TikTok');
+}
+
+main().catch(async (e) => {
+  console.error(e);
+  try { await api('fail', { error: String((e && e.message) || e) }); } catch (x) { /* rien */ }
+  process.exit(1);
+});
