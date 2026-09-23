@@ -214,7 +214,7 @@ function teaser(ctx, env, sc, lt) {
     ctx.save(); ctx.globalAlpha = 0.35 + 0.3 * Math.sin(lt * 2 + i);
     tc(ctx, '?', side, y0 - ((lt * 60 + r() * 200) % 200), Math.round(90 + r() * 40), F.display, pal.b); ctx.restore();
   }
-  const url = 'alvecapital.fr', n = Math.floor(url.length * prog(lt, 0.4, 0.8));
+  const url = 'LIEN DANS LA BIO', n = Math.floor(url.length * prog(lt, 0.4, 0.8));
   tc(ctx, url.slice(0, n) + (lt % 0.8 < 0.4 ? '|' : ' '), 540, 1180, 64, F.black, '#FFFFFF', rgba(pal.a, 0.9));
   emojiAt(ctx, env, sc.emoji, 880, 420, 140, lt);
 }
@@ -232,7 +232,7 @@ function outro(ctx, env, sc, lt) {
   tc(ctx, 'LIEN DANS LA BIO', 540, 940, 44, F.xb, 'rgba(255,255,255,0.85)');
   const by = 985 + Math.abs(Math.sin(lt * 4)) * 18;
   ctx.strokeStyle = pal.hi; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(510, by); ctx.lineTo(540, by + 30); ctx.lineTo(570, by); ctx.stroke();
-  tc(ctx, 'alvecapital.fr', 540, 1110, 76, F.display, pal.hi, rgba(pal.hi, 0.5));
+  tc(ctx, 'CLIQUE SUR LE PROFIL', 540, 1110, 64, F.display, pal.hi, rgba(pal.hi, 0.5));
   ctx.restore();
   ctx.save(); ctx.globalAlpha = prog(lt, 0.9, 0.4);
   const d = '18+  ·  Analyse statistique, pas un conseil  ·  Joue responsable';
