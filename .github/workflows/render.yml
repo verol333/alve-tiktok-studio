@@ -14,9 +14,15 @@ concurrency:
 permissions:
   contents: write
 jobs:
-  render:
+  # Voix clonée fabriquée sur 6 machines en même temps (au lieu d'une seule).
+  voice:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - name: Masquer le jeton
         run: echo "::add-mask::${{ inputs.token }}"
@@ -29,6 +35,55 @@ jobs:
           python-version: '3.11'
       - name: ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - name: Cache du clonage de voix
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/pip
+          key: voice-clone-v1
+      - name: Clonage de voix (Chatterbox)
+        run: |
+          pip install -q torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q "chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git"
+      - name: Voix de cette machine
+        run: node src/voiceShard.mjs
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: 6
+          SCRIPT_ID: ${{ inputs.script_id }}
+          JOB_TOKEN: ${{ inputs.token }}
+          API_URL: ${{ inputs.api }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-${{ matrix.shard }}
+          path: /tmp/voice-out
+          if-no-files-found: ignore
+          retention-days: 1
+  render:
+    needs: voice
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Masquer le jeton
+        run: echo "::add-mask::${{ inputs.token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Voix déjà prêtes
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: voice-*
+          merge-multiple: true
+          path: /tmp/prevoice
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
       - run: npm install --no-audit --no-fund
       - name: Navigateur (vrais écrans du site)
         run: npx playwright install --with-deps chromium > /dev/null
@@ -39,7 +94,7 @@ jobs:
             ~/.cache/huggingface
             ~/.cache/pip
           key: voice-clone-v1
-      - name: Clonage de voix (Chatterbox)
+      - name: Clonage de voix (secours)
         continue-on-error: true
         run: |
           pip install -q torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
