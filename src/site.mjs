@@ -48,7 +48,7 @@ function legs(ctx, env, sc, lt) {
   env.show.legs.forEach((l, i) => {
     const a = i === 0 ? easeOut(prog(lt, 0.2, 0.3)) : easeOut(prog(lt, half, 0.3));
     if (a <= 0) return;
-    const cx = X0 + (14 + i * 170 + 81) * S, s = 'ISSUE ' + (i + 1) + ' · ' + Number(l.odd).toFixed(2);
+    const cx = X0 + (14 + i * 170 + 81) * S, s = 'OPÉRATEUR ' + (i + 1) + ' · ' + Number(l.odd).toFixed(2);
     ctx.save(); ctx.globalAlpha = a; ctx.translate(cx, yb); ctx.scale(0.8 + 0.2 * easeBack(a), 0.8 + 0.2 * easeBack(a));
     font(ctx, 34, env.F.xb); const w = ctx.measureText(s).width + 50;
     rr(ctx, -w / 2, -40, w, 80, 40); ctx.fillStyle = 'rgba(51,217,142,0.14)'; ctx.fill(); ctx.strokeStyle = V.emerald; ctx.lineWidth = 3; ctx.stroke();
@@ -171,4 +171,55 @@ function steps(ctx, env, sc, lt) {
   ctx.restore();
 }
 
-export const SITE_DRAW = { card, legs, calc, outcomes, steps };
+// « Opérateurs africains » : les logos défilent sur trois rangées, un faisceau de scan les balaie.
+function brand(ctx, env, sc, lt) {
+  const F = env.F, ops = env.opLogos || [];
+  ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0, 0.35));
+  tc(ctx, 'AL VE CAPITAL', 540, 400, 110, F.display, V.emerald);
+  const sub = 'SCANNE LES OPÉRATEURS AFRICAINS';
+  tc(ctx, sub, 540, 480, fitSingle(ctx, sub, F.black, 50, 28, 960), F.black, V.ink);
+  ctx.restore();
+  const TW = 300, TH = 150, step = TW + 40;
+  [0, 1, 2].forEach((row) => {
+    const list = ops.filter((_, i) => i % 3 === row); if (!list.length) return;
+    const n = Math.max(list.length, Math.ceil((1080 + step) / step) + 1), total = n * step;
+    const dir = row % 2 ? 1 : -1, y = 590 + row * 190;
+    ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0.15 + 0.12 * row, 0.4));
+    for (let i = 0; i < n; i++) {
+      const o = list[i % list.length], x = (((i * step + dir * lt * 220) % total) + total) % total - step;
+      if (x < -TW || x > 1080) continue;
+      rr(ctx, x, y, TW, TH, 28); ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 20; ctx.fill(); ctx.shadowBlur = 0;
+      if (o.img) { const k = Math.min((TW - 60) / o.img.width, (TH - 50) / o.img.height); ctx.drawImage(o.img, x + (TW - o.img.width * k) / 2, y + (TH - o.img.height * k) / 2, o.img.width * k, o.img.height * k); }
+      else tc(ctx, o.name, x + TW / 2, y + TH / 2 + 14, fitSingle(ctx, o.name, F.black, 40, 18, TW - 40), F.black, '#0B1020');
+    }
+    ctx.restore();
+  });
+  const bx = ((lt * 700) % 1500) - 200, g = ctx.createLinearGradient(bx - 90, 0, bx + 90, 0);
+  g.addColorStop(0, 'rgba(51,217,142,0)'); g.addColorStop(0.5, 'rgba(51,217,142,0.35)'); g.addColorStop(1, 'rgba(51,217,142,0)');
+  ctx.fillStyle = g; ctx.fillRect(bx - 90, 570, 180, 610);
+  ctx.fillStyle = V.emerald; ctx.fillRect(bx - 2, 570, 4, 610);
+}
+
+// Appel à l'action : l'adresse du site se tape dans une barre de navigateur, puis « COMPTE GRATUIT ».
+function site(ctx, env, sc, lt) {
+  const F = env.F, e = easeBack(prog(lt, 0, 0.45));
+  ctx.save(); ctx.globalAlpha = clamp(e, 0, 1); ctx.translate(540, 640); ctx.scale(0.8 + 0.2 * e, 0.8 + 0.2 * e); ctx.translate(-540, -640);
+  raised(ctx, 90, 540, 900, 200, 60, 3);
+  ctx.fillStyle = V.emerald; ctx.beginPath(); ctx.arc(190, 640, 26, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#06101F'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(178, 640); ctx.lineTo(188, 650); ctx.lineTo(204, 630); ctx.stroke();
+  const url = 'alvecapital.fr', nd = Math.round(url.length * prog(lt, 0.3, 0.9));
+  t(ctx, url.slice(0, nd) + (lt % 0.8 < 0.4 ? '|' : ''), 250, 668, fitSingle(ctx, url + '|', F.black, 84, 40, 700), F.black, V.ink);
+  ctx.restore();
+  const b = easeBack(prog(lt, 1.1, 0.4));
+  if (b > 0) {
+    const pulse = 1 + 0.05 * Math.sin(lt * 6);
+    ctx.save(); ctx.globalAlpha = clamp(b, 0, 1); ctx.translate(540, 900); ctx.scale(b * pulse, b * pulse);
+    rr(ctx, -330, -75, 660, 150, 75); ctx.fillStyle = V.emerald; ctx.shadowColor = V.emerald; ctx.shadowBlur = 50; ctx.fill(); ctx.shadowBlur = 0;
+    tc(ctx, 'COMPTE GRATUIT', 0, 24, 68, F.black, '#06101F');
+    ctx.restore();
+    const tap = prog(lt, 1.8, 0.6);
+    if (tap > 0 && tap < 1) { ctx.save(); ctx.globalAlpha = 0.4 * (1 - tap); ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(700, 920, 20 + 90 * tap, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+  }
+}
+
+export const SITE_DRAW = { card, legs, calc, outcomes, steps, brand, site };
