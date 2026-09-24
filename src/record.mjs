@@ -106,7 +106,7 @@ async function act(page, a, mark) {
   await loc.click({ timeout: 8000 });
   if (a.fill) {
     await wait(500);
-    for (const ch of String(a.value)) { await page.keyboard.type(ch); mark('key'); await wait(230); }
+    for (const ch of String(a.value)) { await page.keyboard.type(ch); mark('key'); await wait(110); }
   }
   await wait(a.wait || 1500);
 }
