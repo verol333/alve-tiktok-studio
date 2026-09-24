@@ -65,7 +65,7 @@ async function main() {
     style: Object.assign({ hook_style: 'slam', subtitle_style: 'pill' }, style),
     F: await loadFonts(DIR), total: tl.total, picks: job.picks, totalOdds: Number(job.total_odds) || 2,
     particles: makeParticles(), emoji: {}, logos: [],
-    type: job.video_type || 'prono', show: job.showcase || null, when: style.when || '', bookLogos: [],
+    type: job.video_type || 'prono', show: job.showcase || null, proof: job.proof || null, when: style.when || '', bookLogos: [],
     hudSub: style.hud_sub || 'Analyse foot du jour', bgAlpha: job.video_type === 'site' ? 0.2 : 0.9,
   };
   if (!Array.isArray(env.style.transitions) || !env.style.transitions.length) env.style.transitions = ['zoom', 'slide', 'whip', 'flash'];
