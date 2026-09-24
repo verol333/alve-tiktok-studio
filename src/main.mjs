@@ -49,6 +49,7 @@ async function keyFrames(file, tl, type) {
 
 async function main() {
   const { job } = await api('job');
+  if (job.video_type === 'long') { const { runLong } = await import('./long.mjs'); return runLong(job, DIR); }
   const style = job.style || {};
   console.log('Script du ' + job.day_date + ' : ' + job.scenes.length + ' scènes, palette ' + style.palette);
   // Voix clonée si un enregistrement de référence existe ; sinon (ou en cas
