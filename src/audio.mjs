@@ -41,7 +41,12 @@ export function sfxEvents(tl, env) {
     if (s.kind === 'legs') ev.push({ name: 'ding', at: s.start + 0.3, vol: 0.4 }, { name: 'ding', at: s.start + s.dur * 0.45, vol: 0.4 });
     if (s.kind === 'calc') ev.push({ name: 'rise', at: s.start + 1.0, vol: 0.35 });
     if (s.kind === 'outcomes') ev.push({ name: 'impact', at: s.start + 1.0, vol: 0.7 }, { name: 'ding', at: s.start + 1.0, vol: 0.5 });
-    if (s.kind === 'steps') ev.push({ name: 'ding', at: s.start + 0.3// Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
+    if (s.kind === 'steps') ev.push({ name: 'ding', at: s.start + 0.3, vol: 0.35 });
+  });
+  return ev;
+}
+
+// Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
 export async function libraryMusic(dir, url, total) {
   if (!url) return false;
   try {
