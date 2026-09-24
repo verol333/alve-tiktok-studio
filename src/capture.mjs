@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { join } from 'node:path';
 
 const VW = 390, VH = 844, DPR = 2, MAX_H = 5200;
-export const screenKey = (s) => [s.path, s.click || ''].join('|');
+export const screenKey = (s) => [s.path, JSON.stringify(s.steps || s.click || '')].join('|');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Pop-ups d'accueil marqués comme déjà vus : l'écran reste propre.
@@ -83,20 +83,32 @@ async function shoot(page, base, screen, dir, n) {
   if (out.h > VH) await page.screenshot({ path: out.long, fullPage: true, clip: { x: 0, y: 0, width: VW, height: out.h } });
   else await page.screenshot({ path: out.long });
   await page.evaluate(() => { for (const el of document.querySelectorAll('[data-studio-hide]')) { el.style.removeProperty('visibility'); delete el.dataset.studioHide; } });
-  // 3) Appui sur un bouton du site → écran obtenu.
-  if (screen.click) {
-    const target = page.getByText(screen.click, { exact: false }).first();
-    await target.scrollIntoViewIfNeeded({ timeout: 8000 });
-    await wait(500);
-    const box = await target.boundingBox();
-    out.scroll_at_tap = await page.evaluate(() => window.scrollY);
-    out.tap = box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null;
-    await target.click({ timeout: 8000 });
-    await wait(2800);
-    out.still = join(dir, 'scr' + n + '_still.png');
-    await page.screenshot({ path: out.still });
+  // 3) Gestes sur le site (appuis, saisie au clavier) : un écran par geste,
+  //    et un écran par touche tapée pour montrer la saisie lettre par lettre.
+  const steps = screen.steps || (screen.click ? [{ click: screen.click }] : []);
+  out.stills = [];
+  let m = 0;
+  const snap = async (type, step, tap) => { const f = join(dir, 'scr' + n + '_s' + (m++) + '.png'); await page.screenshot({ path: f }); out.stills.push({ file: f, type, step, tap: tap || null }); };
+  for (const [k, st] of steps.entries()) {
+    if (st.click) {
+      const target = page.getByText(st.click, { exact: false }).first();
+      await target.scrollIntoViewIfNeeded({ timeout: 8000 });
+      await wait(500);
+      if (out.scroll_at_tap == null) out.scroll_at_tap = await page.evaluate(() => window.scrollY);
+      const box = await target.boundingBox();
+      await target.click({ timeout: 8000 });
+      await wait(st.wait || 2600);
+      await snap('click', k, box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null);
+    } else if (st.fill) {
+      const input = page.getByPlaceholder(st.fill).first();
+      if (out.scroll_at_tap == null) out.scroll_at_tap = await page.evaluate(() => window.scrollY);
+      await input.click({ timeout: 8000 });
+      for (const ch of String(st.value)) { await page.keyboard.type(ch); await wait(350); await snap('key', k); }
+      await wait(st.wait || 1500);
+      await snap('settle', k);
+    }
   }
-  console.log('Écran filmé : ' + screen.path + (screen.click ? ' + « ' + screen.click + ' »' : '') + ' (' + out.h + ' px, ' + hidden + ' éléments fixes)');
+  console.log('Écran filmé : ' + screen.path + (out.stills.length ? ' + ' + out.stills.length + ' gestes' : '') + ' (' + out.h + ' px, ' + hidden + ' éléments fixes)');
   return out;
 }
 
