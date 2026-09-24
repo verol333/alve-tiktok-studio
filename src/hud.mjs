@@ -76,7 +76,7 @@ export function drawSubs(ctx, env, sc, t) {
   if (k < 0) k = sc.words.length - 1;
   const chunk = sc.chunks.find((c) => k >= c.from && k <= c.to) || sc.chunks[0];
   const F = env.F, pal = env.pal, pillMode = env.style.subtitle_style === 'pill';
-  const list = sc.words.slice(chunk.from, chunk.to + 1).map((w) => w.text.toUpperCase());
+  const list = sc.words.slice(chunk.from, chunk.to + 1).map((w) => (/alvecapital\.fr/i.test(w.text) ? w.text.toLowerCase() : w.text.toUpperCase()));
   let size = 74; font(ctx, size, F.black);
   let width = ctx.measureText(list.join(' ')).width;
   while (width > 960 && size > 44) { size -= 4; font(ctx, size, F.black); width = ctx.measureText(list.join(' ')).width; }
