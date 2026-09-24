@@ -233,7 +233,7 @@ function outro(ctx, env, sc, lt) {
   tc(ctx, 'LIEN DANS LA BIO', 540, 940, 44, F.xb, 'rgba(255,255,255,0.85)');
   const by = 985 + Math.abs(Math.sin(lt * 4)) * 18;
   ctx.strokeStyle = pal.hi; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(510, by); ctx.lineTo(540, by + 30); ctx.lineTo(570, by); ctx.stroke();
-  tc(ctx, 'CLIQUE SUR LE PROFIL', 540, 1110, 64, F.display, pal.hi, rgba(pal.hi, 0.5));
+  tc(ctx, 'ALVECAPITAL.FR', 540, 1110, 80, F.display, pal.hi, rgba(pal.hi, 0.5));
   ctx.restore();
   ctx.save(); ctx.globalAlpha = prog(lt, 0.9, 0.4);
   const d = '18+  ·  Analyse statistique, pas un conseil  ·  Joue responsable';
