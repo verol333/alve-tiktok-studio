@@ -11,7 +11,7 @@ import { api, download } from './api.mjs';
 import { run, duration } from './sh.mjs';
 import { loadFonts, loadImg } from './assets.mjs';
 import { buildTimeline } from './timeline.mjs';
-import { makeSfx, mixAudio } from './audio.mjs';
+import { makeSfx, mixAudio, libraryMusic } from './audio.mjs';
 import { cloneVoices } from './clone.mjs';
 import { captureScreens, screenKey } from './capture.mjs';
 import { loadShots, screenState, drawPhone, stepTimes } from './phone.mjs';
@@ -399,7 +399,7 @@ function events(tl, env) {
 }
 
 // Aperçu déposé sur le dépôt du studio (trop lourd pour un envoi direct).
-async function publishPreview(file) {
+export async function publishPreview(file) {
   const repo = process.env.GH_REPO, tok = process.env.GH_TOKEN;
   if (!repo || !tok) throw new Error('Jeton du dépôt manquant');
   const hd = { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json', 'User-Agent': 'alve-studio' };
@@ -413,7 +413,7 @@ async function publishPreview(file) {
   return j.browser_download_url;
 }
 
-async function voices(job, DIR) {
+export async function voices(job, DIR) {
   let cloned = null;
   if (job.clone_voice_url) {
     try { cloned = await cloneVoices(DIR, job.clone_voice_url, job.scenes); console.log('Voix clonée prête'); }
@@ -465,16 +465,7 @@ export async function runLong(job, DIR) {
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
   await render(env, tl, video);
   await makeSfx(DIR, tl.total);
-  const musicUrl = job.music_url || (job.style || {}).music_url;
-  if (musicUrl) {
-    // Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
-    try {
-      const mp3 = join(DIR, 'music_src.mp3');
-      await download(musicUrl, mp3);
-      await run('ffmpeg', ['-y', '-stream_loop', '-1', '-i', mp3, '-t', String(tl.total + 1), '-af', 'volume=0.32,afade=t=in:d=2,afade=t=out:st=' + Math.max(0, tl.total - 3) + ':d=3', '-ar', '44100', '-ac', '2', join(DIR, 'music.wav')]);
-      console.log('Musique de fond : bibliothèque');
-    } catch (e) { console.error('Musique de la bibliothèque indisponible, musique générée utilisée'); }
-  }
+  await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
   await mixAudio(DIR, tl, vo.files, events(tl, env), audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
   const { out } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', final]);
