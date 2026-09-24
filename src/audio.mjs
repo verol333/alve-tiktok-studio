@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { run } from './sh.mjs';
+import { download } from './api.mjs';
 import { comboRevealAt } from './scenes.mjs';
 
 // Bruitages et musique douce fabriqués sur place (aucun fichier sous droits).
@@ -40,25 +41,41 @@ export function sfxEvents(tl, env) {
     if (s.kind === 'legs') ev.push({ name: 'ding', at: s.start + 0.3, vol: 0.4 }, { name: 'ding', at: s.start + s.dur * 0.45, vol: 0.4 });
     if (s.kind === 'calc') ev.push({ name: 'rise', at: s.start + 1.0, vol: 0.35 });
     if (s.kind === 'outcomes') ev.push({ name: 'impact', at: s.start + 1.0, vol: 0.7 }, { name: 'ding', at: s.start + 1.0, vol: 0.5 });
-    if (s.kind === 'steps') ev.push({ name: 'ding', at: s.start + 0.3, vol: 0.35 });
-  });
-  return ev;
+    if (s.kind === 'steps') ev.push({ name: 'ding', at: s.start + 0.3// Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
+export async function libraryMusic(dir, url, total) {
+  if (!url) return false;
+  try {
+    const mp3 = join(dir, 'music_src.mp3');
+    await download(url, mp3);
+    await run('ffmpeg', ['-y', '-stream_loop', '-1', '-i', mp3, '-t', String(total + 1), '-af', 'volume=0.32,afade=t=in:d=2,afade=t=out:st=' + Math.max(0, total - 3) + ':d=3', '-ar', '44100', '-ac', '2', join(dir, 'music.wav')]);
+    console.log('Musique de fond : bibliothèque');
+    return true;
+  } catch (e) { console.error('Musique de la bibliothèque indisponible, musique générée utilisée'); return false; }
 }
 
-// Voix calées sur les scènes + musique qui s'efface sous la voix + bruitages.
+// Voix au premier plan : chaque piste est d'abord remise au même niveau, puis
+// éclaircie (médiums de l'articulation renforcés, graves boueux retirés) et
+// compressée. La musique reste en retrait et s'efface nettement sous la voix.
 export async function mixAudio(dir, tl, voiceFiles, events, out) {
+  const clean = [];
+  for (const [i, f] of voiceFiles.entries()) {
+    const o = join(dir, 'vn' + i + '.wav');
+    await run('ffmpeg', ['-y', '-i', f, '-af', 'highpass=f=85,loudnorm=I=-15:TP=-1.5:LRA=7', '-ar', '44100', '-ac', '2', o]);
+    clean.push(o);
+  }
   const args = ['-y'], parts = [], vl = [], fx = [];
   const T = tl.total.toFixed(2);
+  const voiceFx = 'equalizer=f=250:t=q:w=1:g=-2,equalizer=f=3200:t=q:w=1.2:g=4,equalizer=f=6500:t=q:w=1:g=1.5,acompressor=threshold=0.125:ratio=2.5:attack=8:release=160:makeup=1.6';
   let idx = 0;
-  voiceFiles.forEach((f, i) => {
+  clean.forEach((f, i) => {
     args.push('-i', f);
-    parts.push('[' + idx + ':a]aresample=44100,aformat=channel_layouts=stereo,adelay=delays=' + Math.round(tl.scenes[i].voiceAt * 1000) + ':all=1[v' + i + ']');
+    parts.push('[' + idx + ':a]aformat=channel_layouts=stereo,' + voiceFx + ',adelay=delays=' + Math.round(tl.scenes[i].voiceAt * 1000) + ':all=1[v' + i + ']');
     vl.push('[v' + i + ']'); idx++;
   });
   parts.push(vl.join('') + 'amix=inputs=' + vl.length + ':normalize=0:duration=longest,apad=whole_dur=' + T + ',asplit=2[vmix][vkey]');
   args.push('-i', join(dir, 'music.wav'));
-  parts.push('[' + idx + ':a]volume=0.5[mu]'); idx++;
-  parts.push('[mu][vkey]sidechaincompress=threshold=0.015:ratio=10:attack=10:release=450[duck]');
+  parts.push('[' + idx + ':a]volume=0.3[mu]'); idx++;
+  parts.push('[mu][vkey]sidechaincompress=threshold=0.012:ratio=14:attack=8:release=500[duck]');
   events.forEach((e, j) => {
     args.push('-i', join(dir, e.name + '.wav'));
     parts.push('[' + idx + ':a]adelay=delays=' + Math.max(0, Math.round(e.at * 1000)) + ':all=1,volume=' + e.vol + '[f' + j + ']');
