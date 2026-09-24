@@ -11,6 +11,8 @@ on:
 concurrency:
   group: render
   cancel-in-progress: false
+permissions:
+  contents: write
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -46,3 +48,5 @@ jobs:
           SCRIPT_ID: ${{ inputs.script_id }}
           JOB_TOKEN: ${{ inputs.token }}
           API_URL: ${{ inputs.api }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
