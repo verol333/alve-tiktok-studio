@@ -7,7 +7,12 @@ import { run } from './sh.mjs';
 // Voix déjà fabriquées en parallèle par les machines « voix » (voir render.yml).
 export const PRE_DIR = '/tmp/prevoice';
 
-const sayable = (s) => String(s.voice || s.text || '').replace(/\bal\s*v[eé]\s*capital\b/gi, 'Alvé Capital');
+// Texte dit comme on parle : adresse du site d'un souffle, « francs » sans « CFA ».
+const sayable = (s) => String(s.voice || s.text || '')
+  .replace(/alvecapital\.fr/gi, 'Alvé capital point èfère')
+  .replace(/\bal\s*v[eé]\s*capital\b/gi, 'Alvé capital')
+  .replace(/\bpoint\s+F\s*R\b/gi, 'point èfère')
+  .replace(/\bfrancs?\s+CFA\b/gi, 'francs').replace(/\bF\s?CFA\b/g, 'francs').replace(/\s*\bCFA\b/g, '');
 export const voiceKey = (text) => createHash('sha1').update(text).digest('hex').slice(0, 16);
 
 // Référence propre : silence de début retiré, volume normalisé, mono 24 kHz.
