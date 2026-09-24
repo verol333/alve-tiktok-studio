@@ -73,6 +73,8 @@ async function main() {
   for (const p of job.picks) env.logos.push({ home: await loadImg(p.logo_home), away: await loadImg(p.logo_away) });
   if (env.show) {
     for (const l of env.show.legs) env.bookLogos.push(await loadImg(l.logo));
+    env.opLogos = [];
+    for (const o of env.show.operators || []) env.opLogos.push({ name: o.name, img: await loadImg(o.logo) });
     if (env.show.sport_emoji) env.emoji[env.show.sport_emoji] = await loadEmoji(env.show.sport_emoji);
   }
   for (const s of job.scenes) if (s.emoji && !(s.emoji in env.emoji)) env.emoji[s.emoji] = await loadEmoji(s.emoji);
