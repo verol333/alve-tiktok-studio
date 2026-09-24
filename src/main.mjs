@@ -38,6 +38,7 @@ async function keyFrames(file, tl, type) {
     ? [['hook', 0.8], ['card', 1.8], ['calc', 2.6], ['outcomes', -0.3], ['outro', 1.5]]
     : [['hook', 0.8], ['match', 1.6], ['pick', 2.0], ['combo', -0.3], ['outro', 1.5]];
   for (const [k, off] of plan) add(by(k), off);
+  if (type === 'reel') { times.length = 0; for (const f of [0.04, 0.28, 0.5, 0.72, 0.93]) times.push(tl.total * f); }
   const out = [];
   for (const [i, t] of times.entries()) {
     const f = join(DIR, 'k' + i + '.jpg');
@@ -50,6 +51,11 @@ async function keyFrames(file, tl, type) {
 async function main() {
   const { job } = await api('job');
   if (job.video_type === 'long') { const { runLong } = await import('./long.mjs'); return runLong(job, DIR); }
+  if ((job.style || {}).format === 'reel') {
+    const { buildReel } = await import('./reel.mjs');
+    const r = await buildReel(job, DIR);
+    return deliver(job, r.final, r.tl, r.audio, 'reel', r.voice);
+  }
   const style = job.style || {};
   console.log('Script du ' + job.day_date + ' : ' + job.scenes.length + ' scènes, palette ' + style.palette);
   // Voix clonée si un enregistrement de référence existe ; sinon (ou en cas
@@ -97,17 +103,29 @@ async function main() {
   await makeSfx(DIR, tl.total);
   await mixAudio(DIR, tl, voiceFiles, sfxEvents(tl, env), audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
+  return deliver(job, final, tl, audio, env.type, cloned ? 'clone' : 'henri');
+}
+
+// Contrôles, relecture puis envoi (commun à tous les formats verticaux).
+async function deliver(job, final, tl, audio, type, voice) {
   if (job.dry_run) {
     // Montage d'essai : version allégée de la vidéo complète, à regarder dans l'appli.
     const prev = join(DIR, 'preview.mp4');
-    await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', prev]);
-    const b64 = readFileSync(prev).toString('base64'), voice = cloned ? 'clone' : 'henri';
-    await api('preview', { video: b64, voice }).catch(() => api('preview', { audio: b64, voice })).catch((e) => console.error('Aperçu : ' + e.message));
+    const reel = type === 'reel';
+    await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', reel ? '24' : '30', '-c:a', 'aac', '-b:a', reel ? '128k' : '96k', '-movflags', '+faststart', prev]);
+    if (reel) {
+      // Trop lourde pour un envoi direct : déposée sur le dépôt du studio.
+      const { publishPreview } = await import('./long.mjs');
+      await api('preview', { video_url: await publishPreview(prev), voice });
+    } else {
+      const b64 = readFileSync(prev).toString('base64');
+      await api('preview', { video: b64, voice }).catch(() => api('preview', { audio: b64, voice })).catch((e) => console.error('Aperçu : ' + e.message));
+    }
   }
 
   const metrics = await checks(final, tl, audio);
   console.log('Contrôle technique OK', JSON.stringify(metrics));
-  const { review } = await api('review', { frames: await keyFrames(final, tl, env.type), metrics });
+  const { review } = await api('review', { frames: await keyFrames(final, tl, type), metrics });
   if (!review.ok) throw new Error('Relecture : ' + review.issues.join(' ; '));
   console.log('Relecture visuelle OK');
 
