@@ -1,6 +1,7 @@
 import { W, H, clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, fitSingle, drawWords, isHi, tc, shakeAt, seeded } from './draw.mjs';
 import { SITE_DRAW } from './site.mjs';
 
+const caps = (s) => String(s || '').toUpperCase().replace(/ALVECAPITAL\.FR/g, 'alvecapital.fr');
 const hhmm = (iso) => { try { return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Brazzaville' }).format(new Date(iso)); } catch (e) { return ''; } };
 
 function emojiAt(ctx, env, ch, cx, cy, size, lt) {
@@ -46,7 +47,7 @@ function pill(ctx, env, s, cy, size, alpha) {
 
 function bigText(ctx, env, sc, lt, o) {
   const F = env.F, pal = env.pal;
-  const fit = fitLines(ctx, String(sc.text).toUpperCase(), F.display, o.size, o.min, 940, o.maxLines);
+  const fit = fitLines(ctx, caps(sc.text), F.display, o.size, o.min, 940, o.maxLines);
   const lh = fit.size * 1.08, y0 = o.cy - ((fit.lines.length - 1) * lh) / 2 + fit.size * 0.35;
   fit.lines.forEach((line, i) => {
     let dx = 0, s = 1, alpha = 1;
@@ -215,7 +216,7 @@ function teaser(ctx, env, sc, lt) {
     ctx.save(); ctx.globalAlpha = 0.35 + 0.3 * Math.sin(lt * 2 + i);
     tc(ctx, '?', side, y0 - ((lt * 60 + r() * 200) % 200), Math.round(90 + r() * 40), F.display, pal.b); ctx.restore();
   }
-  const url = 'LIEN DANS LA BIO', n = Math.floor(url.length * prog(lt, 0.4, 0.8));
+  const url = 'alvecapital.fr', n = Math.floor(url.length * prog(lt, 0.4, 0.8));
   tc(ctx, url.slice(0, n) + (lt % 0.8 < 0.4 ? '|' : ' '), 540, 1180, 64, F.black, '#FFFFFF', rgba(pal.a, 0.9));
   emojiAt(ctx, env, sc.emoji, 880, 420, 140, lt);
 }
@@ -230,10 +231,10 @@ function outro(ctx, env, sc, lt) {
   tc(ctx, env.type === 'site' ? 'TA QUESTION' : 'TON SCORE EXACT', 540, 740, 54, F.black, '#FFFFFF'); tc(ctx, 'EN COMMENTAIRE', 540, 810, 54, F.black, pal.hi);
   ctx.restore();
   ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0.6, 0.4));
-  tc(ctx, 'LIEN DANS LA BIO', 540, 940, 44, F.xb, 'rgba(255,255,255,0.85)');
+  tc(ctx, 'RENDEZ-VOUS SUR NOTRE SITE', 540, 940, 44, F.xb, 'rgba(255,255,255,0.85)');
   const by = 985 + Math.abs(Math.sin(lt * 4)) * 18;
   ctx.strokeStyle = pal.hi; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(510, by); ctx.lineTo(540, by + 30); ctx.lineTo(570, by); ctx.stroke();
-  tc(ctx, 'ALVECAPITAL.FR', 540, 1110, 80, F.display, pal.hi, rgba(pal.hi, 0.5));
+  tc(ctx, 'alvecapital.fr', 540, 1110, 80, F.display, pal.hi, rgba(pal.hi, 0.5));
   ctx.restore();
   ctx.save(); ctx.globalAlpha = prog(lt, 0.9, 0.4);
   const d = '18+  ·  Analyse statistique, pas un conseil  ·  Joue responsable';
@@ -241,7 +242,38 @@ function outro(ctx, env, sc, lt) {
   ctx.restore();
 }
 
-const DRAW = { hook, retention, match, pick, combo, teaser, outro, ...SITE_DRAW };
+// Preuve : nos pronostics validés la veille sur le site (chiffres réels).
+function results(ctx, env, sc, lt) {
+  const pal = env.pal, F = env.F, p = env.proof;
+  if (!p || !p.wins || !p.wins.length) return retention(ctx, env, sc, lt);
+  const G = '#33D98E';
+  ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 0, 0.3));
+  tc(ctx, 'NOS RÉSULTATS VALIDÉS', 540, 380, 56, F.black, '#FFFFFF', rgba(pal.a, 0.7));
+  ctx.restore();
+  const c = easeOut(prog(lt, 0.2, 0.9)), n = Math.round(p.won * c);
+  ctx.save(); const z = 1 + 0.08 * Math.sin(Math.PI * prog(lt, 1.1, 0.25)); ctx.translate(540, 560); ctx.scale(z, z);
+  tc(ctx, String(n), 0, 0, 180, F.display, G, 'rgba(51,217,142,0.6)'); ctx.restore();
+  tc(ctx, 'PRONOSTICS VALIDÉS HIER', 540, 650, 38, F.xb, 'rgba(255,255,255,0.85)');
+  p.wins.slice(0, 3).forEach((w, i) => {
+    const e = easeOut(prog(lt, 0.5 + 0.2 * i, 0.4)), y = 700 + i * 175, x = 80 + (1 - e) * 1000;
+    ctx.save(); ctx.globalAlpha = e;
+    rr(ctx, x, y, 920, 150, 32); ctx.fillStyle = 'rgba(8,12,26,0.82)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(51,217,142,0.8)'; ctx.stroke();
+    const teams = w.team_home + ' - ' + w.team_away;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    fitSingle(ctx, teams, F.sb, 26, 16, 580); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(teams, x + 40, y + 58);
+    fitSingle(ctx, String(w.label), F.xb, 34, 18, 580); ctx.fillStyle = '#FFFFFF'; ctx.fillText(String(w.label), x + 40, y + 110);
+    ctx.textAlign = 'center';
+    tc(ctx, String(w.final_score).replace('-', ' - '), x + 730, y + 94, 50, F.display, '#FFFFFF');
+    ctx.fillStyle = G; ctx.beginPath(); ctx.arc(x + 860, y + 75, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#06101F'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x + 846, y + 76); ctx.lineTo(x + 857, y + 87); ctx.lineTo(x + 875, y + 64); ctx.stroke();
+    ctx.restore();
+  });
+  ctx.save(); ctx.globalAlpha = easeOut(prog(lt, 1.3, 0.4));
+  tc(ctx, 'alvecapital.fr', 540, 1250, 56, F.display, pal.hi, rgba(pal.hi, 0.5)); ctx.restore();
+}
+
+const DRAW = { hook, retention, match, pick, combo, teaser, outro, results, ...SITE_DRAW };
 
 function shakeOf(env, sc, lt) {
   if (sc.kind === 'match') return shakeAt(lt, 0.45, 16);
