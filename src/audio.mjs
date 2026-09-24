@@ -8,6 +8,12 @@ export async function makeSfx(dir, total) {
   await gen('whoosh.wav', 'anoisesrc=d=0.5:c=pink:a=0.6', ['-af', 'highpass=f=400,lowpass=f=6000,afade=t=in:st=0:d=0.22,afade=t=out:st=0.22:d=0.28']);
   await gen('impact.wav', "aevalsrc='0.9*sin(2*PI*(45+140*exp(-18*t))*t)*exp(-5*t)':d=0.8:s=44100");
   await gen('ding.wav', "aevalsrc='0.3*(sin(2*PI*1318.5*t)+0.5*sin(2*PI*1975.5*t))*exp(-4*t)':d=1:s=44100");
+  await gen('key.wav', "aevalsrc='0.55*(2*random(0)-1)*exp(-140*t)+0.25*sin(2*PI*2100*t)*exp(-110*t)':d=0.09:s=44100", ['-af', 'highpass=f=700']);
+  const clack = '(0.5*(2*random(0)-1)*exp(-120*mod(t,0.082))+0.2*sin(2*PI*1900*t)*exp(-95*mod(t,0.082)))*(0.65+0.35*sin(11*t))';
+  await gen('keys.wav', "aevalsrc='" + clack + "':d=1.5:s=44100", ['-af', 'highpass=f=700,afade=t=out:st=1.2:d=0.3']);
+  await gen('keys_s.wav', "aevalsrc='" + clack + "':d=0.8:s=44100", ['-af', 'highpass=f=700,afade=t=out:st=0.6:d=0.2']);
+  await gen('pop.wav', "aevalsrc='0.45*sin(2*PI*(500+900*exp(-28*t))*t)*exp(-15*t)':d=0.3:s=44100");
+  await gen('tap.wav', "aevalsrc='0.5*sin(2*PI*950*t)*exp(-55*t)+0.3*(2*random(0)-1)*exp(-160*t)':d=0.15:s=44100");
   await gen('rise.wav', "aevalsrc='0.22*sin(2*PI*(200+700*t)*t)*(t/1.2)':d=1.2:s=44100");
   const chord = (a, b) => 'if(lt(mod(t,8),4),' + a + ',' + b + ')';
   const pad = '0.045*(sin(2*PI*' + chord(220, 174.61) + '*t)+sin(2*PI*' + chord(261.63, 220) + '*t)+sin(2*PI*' + chord(329.63, 261.63) + '*t))*(0.75+0.25*sin(2*PI*0.5*t))';
