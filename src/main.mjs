@@ -7,6 +7,7 @@ import { buildTimeline } from './timeline.mjs';
 import { PALETTES, makeParticles } from './hud.mjs';
 import { renderVideo } from './render.mjs';
 import { makeSfx, mixAudio, sfxEvents } from './audio.mjs';
+import { cloneVoices } from './clone.mjs';
 
 const DIR = '/tmp/studio';
 mkdirSync(DIR, { recursive: true });
@@ -50,11 +51,21 @@ async function main() {
   const { job } = await api('job');
   const style = job.style || {};
   console.log('Script du ' + job.day_date + ' : ' + job.scenes.length + ' scènes, palette ' + style.palette);
+  // Voix clonée si un enregistrement de référence existe ; sinon (ou en cas
+  // d'échec) la voix Henri déjà préparée pour chaque scène.
+  let cloned = null;
+  if (job.clone_voice_url) {
+    try { cloned = await cloneVoices(DIR, job.clone_voice_url, job.scenes); console.log('Voix clonée prête'); }
+    catch (e) { console.error('Clonage impossible, voix Henri utilisée : ' + String((e && e.message) || e).slice(-300)); }
+  }
   const voiceFiles = [], durs = [];
   for (const [i, s] of job.scenes.entries()) {
-    const f = join(DIR, 'v' + i + '.mp3');
-    await download(s.audio_url, f);
-    const d = await duration(f);
+    let f = cloned && cloned[i], d = f ? await duration(f).catch(() => 0) : 0;
+    if (!(d > 0.4)) {
+      f = join(DIR, 'v' + i + '.mp3');
+      await download(s.audio_url, f);
+      d = await duration(f);
+    }
     if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
     voiceFiles.push(f); durs.push(d);
   }
@@ -84,6 +95,7 @@ async function main() {
   await renderVideo(env, tl, video);
   await makeSfx(DIR, tl.total);
   await mixAudio(DIR, tl, voiceFiles, sfxEvents(tl, env), audio);
+  if (job.dry_run) await api('preview', { audio: readFileSync(audio).toString('base64'), voice: cloned ? 'clone' : 'henri' }).catch((e) => console.error('Aperçu : ' + e.message));
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
 
   const metrics = await checks(final, tl, audio);
