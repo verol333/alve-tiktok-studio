@@ -279,7 +279,77 @@ function coupon(ctx, F, lt, T) {
   }
 }
 
-export const VISUALS = { odds, discret, outcomes, speed, leverage, shield, coupon };
+// ── Scan des opérateurs en temps réel (logos) ──
+function books(ctx, F, lt, T, v) {
+  const L = (v.logos || []).slice(0, 12), hi = v.hi || [], cols = 3, cw = 196, ch = 120, gap = 26;
+  const blink = 0.5 + 0.5 * Math.sin(lt * 6);
+  ctx.fillStyle = rgba(G, 0.35 + 0.65 * blink); ctx.beginPath(); ctx.arc(CXP - 175, 196, 9, 0, Math.PI * 2); ctx.fill();
+  tx(ctx, 'SCAN EN TEMPS RÉEL', CXP + 12, 205, 26, F.xb, MUTE, 'center');
+  const found = lt > T(0.62);
+  L.forEach((b, i) => {
+    const x = X0 + (i % cols) * (cw + gap), y = 240 + Math.floor(i / cols) * (ch + 20);
+    const p = ap(lt, T(0.02) + i * 0.07, 0.45); if (p <= 0) return;
+    const lit = prog(lt, T(0.25) + i * 0.12, 0.3), on = found && hi.includes(b.name);
+    ctx.save(); enter(ctx, p, 0, 24);
+    card(ctx, x, y, cw, ch, on ? G : lit > 0 && lit < 1 ? B : null);
+    if (found && !on) { ctx.globalAlpha *= 0.45; }
+    const img = v._imgs && v._imgs[i];
+    if (img && img.width) { const k = Math.min(150 / img.width, 56 / img.height), w = img.width * k, hh = img.height * k; ctx.drawImage(img, x + (cw - w) / 2, y + 20 + (56 - hh) / 2, w, hh); }
+    else tx(ctx, b.name, x + cw / 2, y + 60, 26, F.xb, INK, 'center');
+    tx(ctx, lit >= 1 ? 'scanné' : lit > 0 ? 'lecture…' : '', x + cw / 2, y + 104, 20, F.sb, lit >= 1 ? (on ? G : MUTE) : B, 'center');
+    ctx.restore();
+    if (on) mark(ctx, x + cw - 20, y + 20, 16, G, prog(lt, T(0.62), 0.4), true);
+  });
+  const rows = Math.ceil(L.length / cols), sp = prog(lt, T(0.25), Math.max(0.6, L.length * 0.12 + 0.3));
+  if (sp > 0 && sp < 1) {
+    const y = 240 + sp * rows * (ch + 20), g = ctx.createLinearGradient(0, y - 34, 0, y + 34);
+    g.addColorStop(0, rgba(G, 0)); g.addColorStop(0.5, rgba(G, 0.35)); g.addColorStop(1, rgba(G, 0));
+    ctx.fillStyle = g; ctx.fillRect(X0 - 10, y - 34, PW + 20, 68);
+  }
+  const pb = ap(lt, T(0.62), 0.5);
+  if (pb > 0) { ctx.save(); enter(ctx, pb); card(ctx, X0, 820, PW, 100, G); tx(ctx, L.length + ' opérateurs · écart de cote repéré', CXP, 882, 30, F.xb, INK, 'center'); ctx.restore(); }
+}
+
+// ── Code de confirmation reçu par mail ──
+const otpPress = (T) => T(0.36) + 6 * 0.22 + 0.4;
+function otp(ctx, F, lt, T, v) {
+  const code = String(v.code || '482913');
+  const pn = ap(lt, T(0.02), 0.6);
+  if (pn > 0) {
+    ctx.save(); enter(ctx, pn, 0, -60); card(ctx, X0, 190, PW, 150, B);
+    ctx.fillStyle = rgba(B, 0.2); rr(ctx, X0 + 30, 225, 80, 80, 22); ctx.fill();
+    ctx.strokeStyle = B; ctx.lineWidth = 5; rr(ctx, X0 + 48, 248, 44, 34, 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X0 + 49, 252); ctx.lineTo(X0 + 70, 268); ctx.lineTo(X0 + 91, 252); ctx.stroke();
+    tx(ctx, 'AL VE CAPITAL · maintenant', X0 + 136, 250, 22, F.sb, MUTE);
+    tx(ctx, 'Ton code : ' + code.slice(0, 3) + ' ' + code.slice(3), X0 + 136, 302, 38, F.xb, INK);
+    ctx.restore();
+  }
+  const pb = ap(lt, T(0.3), 0.5), t0 = T(0.36);
+  if (pb > 0) {
+    ctx.save(); enter(ctx, pb);
+    tx(ctx, 'CODE DE CONFIRMATION', CXP, 420, 24, F.xb, MUTE, 'center');
+    tx(ctx, v.email || '', CXP, 462, 26, F.sb, MUTE, 'center');
+    const bw = 88, g = 22, x0 = CXP - (6 * bw + 5 * g) / 2;
+    for (let i = 0; i < 6; i++) {
+      const x = x0 + i * (bw + g), on = lt >= t0 + i * 0.22, cur = !on && (i === 0 || lt >= t0 + (i - 1) * 0.22);
+      card(ctx, x, 500, bw, 110, on ? G : cur ? B : null);
+      if (on) { const k = Math.max(0.01, easeBack(prog(lt, t0 + i * 0.22, 0.25))); ctx.save(); ctx.translate(x + bw / 2, 578); ctx.scale(k, k); tx(ctx, code[i], 0, 0, 60, F.display, INK, 'center'); ctx.restore(); }
+    }
+    ctx.restore();
+  }
+  const press = otpPress(T), pc = ap(lt, press - 0.4, 0.4);
+  if (pc > 0) {
+    ctx.save(); enter(ctx, pc); const done = lt > press + 0.15;
+    ctx.fillStyle = G; rr(ctx, X0 + 40, 680, PW - 80, 100, 50); ctx.fill();
+    tx(ctx, done ? 'Compte confirmé  ✓' : 'Confirmer', CXP, 745, 38, F.xb, '#0A0F1E', 'center');
+    ctx.restore();
+    ripple(ctx, CXP + 120, 730, prog(lt, press, 0.6));
+  }
+  const pd = ap(lt, press + 0.4, 0.5);
+  if (pd > 0) { ctx.save(); enter(ctx, pd); mark(ctx, CXP - 190, 862, 24, G, pd, true); tx(ctx, 'Accès à tout le site', CXP - 150, 874, 32, F.xb, INK); ctx.restore(); }
+}
+
+export const VISUALS = { odds, discret, outcomes, speed, leverage, shield, coupon, books, otp };
 
 // Bruitages propres à chaque schéma (instants relatifs au début de la scène).
 export function visualSfx(type, T) {
@@ -297,5 +367,7 @@ export function visualSfx(type, T) {
     for (let i = 0; i < CP.code.length; i++) ev.push(['key', c.code + i * 0.09]);
     ev.push(['ding', c.copied]);
   }
+  if (type === 'books') ev.push(['pop', T(0.02)], ['rise', T(0.25)], ['ding', T(0.62)]);
+  if (type === 'otp') { ev.push(['pop', T(0.02)]); for (let i = 0; i < 6; i++) ev.push(['key', T(0.36) + i * 0.22]); ev.push(['tap', otpPress(T) - 0.05], ['ding', otpPress(T) + 0.15]); }
   return ev;
 }
