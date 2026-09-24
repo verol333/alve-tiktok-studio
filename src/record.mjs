@@ -121,7 +121,7 @@ export async function recordWalkthrough(job, dir) {
     viewport: { width: VW, height: VH }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
     locale: 'fr-FR', timezoneId: 'Africa/Brazzaville',
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-    recordVideo: { dir: join(dir, 'walk'), size: { width: CW, height: CH } },
+    recordVideo: { dir: join(dir, 'walk'), size: { width: VW, height: VH } }, // taille = écran, sinon marge grise
   });
   await ctx.addInitScript(initScript, job.site_token);
   await ctx.addInitScript(cursorScript);
@@ -158,7 +158,7 @@ export async function recordWalkthrough(job, dir) {
   }
   // Vidéo à cadence fixe + recalage de l'horloge (l'enregistrement démarre un peu avant).
   const file = join(dir, 'walk.mp4');
-  await run('ffmpeg', ['-y', '-i', raw, '-vf', 'fps=30,scale=' + CW + ':' + CH, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', file]);
+  await run('ffmpeg', ['-y', '-i', raw, '-vf', 'fps=30,scale=' + CW + ':' + CH + ':flags=lanczos', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', file]);
   const d = await duration(file).catch(() => NaN);
   const off = Number.isFinite(d) ? Math.max(-0.5, Math.min(3, d - tEnd)) : 0;
   for (const k of Object.keys(segs)) { segs[k].start += off; segs[k].end += off; }
