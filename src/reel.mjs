@@ -41,7 +41,7 @@ function fitToClips(tl, segs) {
     if (seg) {
       const len = Math.max(0.5, seg.end - seg.start);
       s.seg = seg; s.rate = 1;
-      if (len > s.dur) { s.rate = Math.min(1.35, len / s.dur); s.dur = len / s.rate; }
+      if (len > s.dur) { s.rate = Math.min(1.6, len / s.dur); s.dur = len / s.rate; }
     }
     t += s.dur;
   });
@@ -176,7 +176,7 @@ function drawCta(ctx, env, s, lt) {
     const g = ctx.createLinearGradient(-420, 0, 420, 0); g.addColorStop(0, '#33D98E'); g.addColorStop(1, '#10B981');
     ctx.fillStyle = g; rr(ctx, -420, -80, 840, 160, 80); ctx.fill(); ctx.shadowBlur = 0;
     font(ctx, 52, env.F.black); ctx.textAlign = 'center'; ctx.fillStyle = '#0A0F1E';
-    ctx.fillText(done ? 'Compte créé  ✓' : 'Créer mon compte gratuit', 0, 18);
+    ctx.fillText(done ? 'Compte créé !' : 'Créer mon compte gratuit', 0, 18);
     ctx.restore();
     const k = prog(lt, tTap - 0.3, 0.8);
     if (k > 0 && k < 1) { ctx.save(); ctx.globalAlpha = 1 - k; ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(W / 2 + 180, 1080, 26 + 90 * k, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
