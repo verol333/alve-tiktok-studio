@@ -465,11 +465,12 @@ export async function runLong(job, DIR) {
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
   await render(env, tl, video);
   await makeSfx(DIR, tl.total);
-  if (job.music_url) {
+  const musicUrl = job.music_url || (job.style || {}).music_url;
+  if (musicUrl) {
     // Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
     try {
       const mp3 = join(DIR, 'music_src.mp3');
-      await download(job.music_url, mp3);
+      await download(musicUrl, mp3);
       await run('ffmpeg', ['-y', '-stream_loop', '-1', '-i', mp3, '-t', String(tl.total + 1), '-af', 'volume=0.32,afade=t=in:d=2,afade=t=out:st=' + Math.max(0, tl.total - 3) + ':d=3', '-ar', '44100', '-ac', '2', join(DIR, 'music.wav')]);
       console.log('Musique de fond : bibliothèque');
     } catch (e) { console.error('Musique de la bibliothèque indisponible, musique générée utilisée'); }
