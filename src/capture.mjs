@@ -9,7 +9,7 @@ export const screenKey = (s) => [s.path, JSON.stringify(s.steps || s.click || ''
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Pop-ups d'accueil marqués comme déjà vus : l'écran reste propre.
-function initScript(tok) {
+export function initScript(tok) {
   Object.defineProperty(navigator, 'webdriver', { get: () => false });
   try {
     const now = String(Date.now());
@@ -23,7 +23,7 @@ function initScript(tok) {
 }
 
 // Ferme les invitations flottantes restantes (hors panneaux de la page).
-async function closeInvites(page) {
+export async function closeInvites(page) {
   await page.evaluate(() => {
     for (const b of document.querySelectorAll('button')) {
       const t = (b.textContent || '').trim();
