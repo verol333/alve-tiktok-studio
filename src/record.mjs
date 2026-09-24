@@ -61,10 +61,12 @@ async function moveTo(page, x, y, ms) {
 async function locate(page, t) {
   const root = t.within === 'dialog' ? page.getByRole('dialog') : page;
   const loc = t.label ? root.locator('[aria-label="' + t.label + '"]')
+    : t.css ? root.locator(t.css)
+    : t.re ? root.getByText(new RegExp(t.re, 'i'))
     : t.placeholder ? root.getByPlaceholder(t.placeholder)
     : root.getByText(t.text, { exact: !!t.exact });
   const vis = loc.locator('visible=true').first();
-  await vis.waitFor({ state: 'visible', timeout: 20000 });
+  await vis.waitFor({ state: 'visible', timeout: t.timeout || 20000 });
   return vis;
 }
 
@@ -91,9 +93,9 @@ async function act(page, a, mark) {
     await smoothScroll(page, a.scroll, ms); await wait(300);
     return;
   }
-  const target = a.tap || a.point || (a.fill ? { placeholder: a.fill } : null);
+  const target = a.tap || a.point || (a.fill ? (typeof a.fill === 'string' ? { placeholder: a.fill } : a.fill) : null);
   if (!target) { await wait(a.wait || 500); return; }
-  const loc = await locate(page, target);
+  const loc = await locate(page, a.soft ? { ...target, timeout: 5000 } : target);
   const box = await bring(page, loc);
   const x = box.x + box.width / 2, y = box.y + box.height / 2;
   await moveTo(page, x, y, 750);
@@ -138,7 +140,10 @@ export async function recordWalkthrough(job, dir) {
           await closeInvites(page); await wait(300);
         }
         const seg = { start: now(), ev: [] };
-        for (const a of w.acts || []) await act(page, a, (type) => seg.ev.push({ type, at: now() - seg.start }));
+        for (const a of w.acts || []) {
+          try { await act(page, a, (type) => seg.ev.push({ type, at: now() - seg.start })); }
+          catch (e) { if (!a.soft) throw e; console.log('Scène ' + (i + 1) + ' : geste facultatif ignoré (' + String(e.message || e).split('\n')[0].slice(0, 120) + ')'); }
+        }
         seg.end = now(); segs[i] = seg;
         console.log('Scène ' + (i + 1) + ' filmée sur le site : ' + (seg.end - seg.start).toFixed(1) + ' s');
       } catch (e) {
