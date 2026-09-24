@@ -95,8 +95,13 @@ async function main() {
   await renderVideo(env, tl, video);
   await makeSfx(DIR, tl.total);
   await mixAudio(DIR, tl, voiceFiles, sfxEvents(tl, env), audio);
-  if (job.dry_run) await api('preview', { audio: readFileSync(audio).toString('base64'), voice: cloned ? 'clone' : 'henri' }).catch((e) => console.error('Aperçu : ' + e.message));
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
+  if (job.dry_run) {
+    // Montage d'essai : version allégée de la vidéo complète, à regarder dans l'appli.
+    const prev = join(DIR, 'preview.mp4');
+    await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', prev]);
+    await api('preview', { video: readFileSync(prev).toString('base64'), voice: cloned ? 'clone' : 'henri' }).catch((e) => console.error('Aperçu : ' + e.message));
+  }
 
   const metrics = await checks(final, tl, audio);
   console.log('Contrôle technique OK', JSON.stringify(metrics));
