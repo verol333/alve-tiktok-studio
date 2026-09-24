@@ -14,7 +14,9 @@ import { buildTimeline } from './timeline.mjs';
 import { makeSfx, mixAudio } from './audio.mjs';
 import { cloneVoices } from './clone.mjs';
 import { captureScreens, screenKey } from './capture.mjs';
-import { loadShots, screenState, drawPhone } from './phone.mjs';
+import { loadShots, screenState, drawPhone, stepTimes } from './phone.mjs';
+import { Broll } from './broll.mjs';
+import { VISUALS, visualSfx } from './visuals.mjs';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from './draw.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
@@ -26,6 +28,21 @@ const COL = { x: 120, w: 1060, cx: 650 };
 function background(ctx, env, s, t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   ctx.fillStyle = P.d1; ctx.fillRect(0, 0, W, H);
+  if (env.brollFrame) {
+    // Plan d'illustration en fond (lent zoom), assombri pour garder le texte lisible.
+    const z = 1.04 + 0.06 * prog(t - s.start, 0, s.dur), w = W * z, h = H * z;
+    ctx.drawImage(env.brollFrame, (W - w) / 2, (H - h) / 2, w, h);
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    const side = s.kind === 'chapter' || s.kind === 'point';
+    g.addColorStop(0, 'rgba(10,15,30,' + (side ? 0.93 : 0.74) + ')');
+    g.addColorStop(0.55, 'rgba(10,15,30,' + (side ? 0.6 : 0.62) + ')');
+    g.addColorStop(1, 'rgba(10,15,30,' + (side ? 0.45 : 0.74) + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.75);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+    return;
+  }
   if (env.bg) {
     const z = 1.08 + 0.05 * Math.sin(t * 0.05);
     const k = Math.max(W / env.bg.width, H / env.bg.height) * z;
@@ -72,6 +89,68 @@ function textBlock(ctx, text, fam, size, min, maxW, maxLines, x, y, color) {
   return fit.lines.length * fit.size * 1.12;
 }
 
+// Titre tapé lettre par lettre, avec curseur clignotant.
+const typeDur = (text) => clamp(String(text || '').length / 30, 0.5, 1.5);
+function typedBlock(ctx, text, fam, size, min, maxW, maxLines, x, y, color, lt, at, caret) {
+  const fit = fitLines(ctx, text, fam, size, min, maxW, maxLines);
+  const total = String(text || '').length, d = typeDur(text);
+  let rem = Math.floor(total * prog(lt, at, d));
+  font(ctx, fit.size, fam); ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  const lh = fit.size * 1.12; let cx = x, cy = y;
+  fit.lines.forEach((l, i) => {
+    const str = l.join(' ');
+    if (rem <= 0) return;
+    const part = str.slice(0, rem), yy = y + i * lh;
+    ctx.fillText(part, x, yy);
+    cx = x + ctx.measureText(part).width; cy = yy;
+    rem -= str.length + 1;
+  });
+  if (lt >= at && lt < at + d + 1.4 && (lt < at + d || Math.floor(lt * 2.4) % 2 === 0)) {
+    ctx.fillStyle = caret; ctx.fillRect(cx + 8, cy - fit.size * 0.8, Math.max(4, fit.size * 0.07), fit.size * 0.92);
+  }
+  return fit.lines.length * lh;
+}
+
+function drawCta(ctx, env, s, lt) {
+  const T = (f) => (s.voiceAt - s.start) + s.voiceDur * f;
+  const url = 'alvecapital.fr', t0 = T(0.12), tType = url.length / 12, tTap = t0 + tType + 1.3;
+  const a = easeOut(prog(lt, 0.1, 0.6));
+  ctx.save(); ctx.globalAlpha *= a; ctx.translate(0, (1 - a) * 30);
+  font(ctx, 72, env.F.black); ctx.textAlign = 'center'; ctx.fillStyle = P.ink;
+  ctx.fillText(s.title || "Ton compte gratuit t'attend", W / 2, 230);
+  ctx.restore();
+  const pb = easeOut(prog(lt, 0.3, 0.6));
+  ctx.save(); ctx.globalAlpha *= pb;
+  const bx = W / 2 - 480, by = 300, bw = 960, bh = 104;
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16;
+  ctx.fillStyle = '#F4F6FB'; rr(ctx, bx, by, bw, bh, 52); ctx.fill(); ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = P.a; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(bx + 62, by + bh / 2, 16, 0, Math.PI * 2); ctx.stroke();
+  const n = Math.floor(url.length * prog(lt, t0, tType));
+  font(ctx, 56, env.F.xb); ctx.textAlign = 'left'; ctx.fillStyle = '#0A0F1E';
+  const part = url.slice(0, n); ctx.fillText(part, bx + 108, by + 72);
+  if (lt < t0 + tType + 0.8 && Math.floor(lt * 2.4) % 2 === 0) { ctx.fillStyle = P.a; ctx.fillRect(bx + 114 + ctx.measureText(part).width, by + 26, 5, 56); }
+  ctx.restore();
+  const pc = prog(lt, t0 + tType + 0.3, 0.6);
+  if (pc > 0) {
+    const done = lt > tTap + 0.1;
+    ctx.save(); ctx.translate(W / 2, 560); const z = Math.max(0.01, easeBack(pc)) * (lt > tTap - 0.08 && lt < tTap + 0.12 ? 0.95 : 1); ctx.scale(z, z);
+    ctx.shadowColor = rgba(P.a, 0.6); ctx.shadowBlur = 50;
+    const g = ctx.createLinearGradient(-380, 0, 380, 0); g.addColorStop(0, '#33D98E'); g.addColorStop(1, '#10B981');
+    ctx.fillStyle = g; rr(ctx, -380, -70, 760, 140, 70); ctx.fill(); ctx.shadowBlur = 0;
+    font(ctx, 50, env.F.black); ctx.textAlign = 'center'; ctx.fillStyle = '#0A0F1E';
+    ctx.fillText(done ? 'Compte créé  ✓' : 'Créer mon compte gratuit', 0, 18);
+    ctx.restore();
+    const k = prog(lt, tTap - 0.3, 0.8);
+    if (k > 0 && k < 1) { ctx.save(); ctx.globalAlpha = 1 - k; ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(W / 2 + 160, 560, 24 + 80 * k, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+  }
+  const q = easeOut(prog(lt, tTap + 0.4, 0.6));
+  ctx.save(); ctx.globalAlpha *= q;
+  font(ctx, 36, env.F.xb); ctx.textAlign = 'center'; ctx.fillStyle = P.mute;
+  ctx.fillText('Pronostics · Arbitrage · Mise automatique · Coupons', W / 2, 740);
+  ctx.restore();
+  s._cta = { t0, tType, tTap };
+}
+
 function drawIntro(ctx, env, s, lt) {
   const p = easeBack(prog(lt, 0.05, 0.9));
   ctx.save(); ctx.translate(W / 2, 330); const z = Math.max(0.01, 0.6 + 0.4 * p); ctx.scale(z, z);
@@ -84,7 +163,8 @@ function drawIntro(ctx, env, s, lt) {
   ctx.fillText('AL VE CAPITAL', W / 2, 640);
   ctx.fillStyle = P.a; ctx.fillRect(W / 2 - 240 * q, 676, 480 * q, 6);
   font(ctx, 52, env.F.xb); ctx.fillStyle = P.ink;
-  ctx.fillText(s.title || 'Le site en quelques minutes', W / 2, 770);
+  const it = s.title || 'Le site en quelques minutes', nn = Math.floor(it.length * prog(lt, 0.9, typeDur(it)));
+  ctx.fillText(it.slice(0, nn), W / 2, 770);
   font(ctx, 32, env.F.sb); ctx.fillStyle = P.mute;
   ctx.fillText('Pronostics · Arbitrage · Mise automatique · ProLab · Montante · Virtuel', W / 2, 836);
   ctx.restore();
@@ -97,10 +177,13 @@ function drawChapter(ctx, env, s, lt) {
   ctx.fillText(String(s.chapter).padStart(2, '0'), 90 - (1 - p) * 80, 720);
   font(ctx, 34, env.F.xb); ctx.fillStyle = acc; ctx.fillText('CHAPITRE ' + s.chapter, COL.x + 10, 420);
   ctx.fillRect(COL.x + 10, 444, 260 * easeOut(prog(lt, 0.2, 0.8)), 7);
-  const q = easeOut(prog(lt, 0.15, 0.6));
-  ctx.save(); ctx.globalAlpha *= q; ctx.translate(0, (1 - q) * 40);
-  textBlock(ctx, s.title, env.F.black, 112, 64, COL.w - 40, 2, COL.x + 10, 580, P.ink);
-  ctx.restore();
+  typedBlock(ctx, s.title, env.F.black, 112, 64, COL.w - 40, 2, COL.x + 10, 580, P.ink, lt, 0.35, acc);
+  const sw = prog(lt, 0.1, 1.1);
+  if (sw > 0 && sw < 1) {
+    const x = -500 + sw * (W + 1000), g = ctx.createLinearGradient(x - 250, 0, x + 250, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.09)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
 }
 
 function drawPoint(ctx, env, s, lt) {
@@ -110,10 +193,7 @@ function drawPoint(ctx, env, s, lt) {
   const cw = Math.min(COL.w, ctx.measureText(chip).width + 56);
   ctx.fillStyle = rgba(acc, 0.16); rr(ctx, COL.x, 130, cw, 52, 26); ctx.fill();
   ctx.fillStyle = acc; ctx.textAlign = 'left'; ctx.fillText(chip, COL.x + 28, 165);
-  const ta = easeOut(prog(lt, 0.1, 0.6));
-  ctx.save(); ctx.globalAlpha *= ta; ctx.translate(0, (1 - ta) * 30);
-  const th = textBlock(ctx, s.title || '', env.F.black, 72, 46, COL.w, 2, COL.x, 280, P.ink);
-  ctx.restore();
+  const th = typedBlock(ctx, s.title || '', env.F.black, 72, 46, COL.w, 2, COL.x, 280, P.ink, lt, 0.15, acc);
   const bl = s.bullets || [], n = bl.length;
   const top = 280 + th + 10, gap = 20;
   const ch = n ? Math.min(118, (900 - top - (n - 1) * gap) / n) : 0;
@@ -242,9 +322,18 @@ function drawFrame(ctx, env, tl, i, t) {
   if (s.kind === 'intro') drawIntro(ctx, env, s, lt);
   else if (s.kind === 'chapter') drawChapter(ctx, env, s, lt);
   else if (s.kind === 'outro') drawOutro(ctx, env, s, lt);
+  else if (s.kind === 'cta') drawCta(ctx, env, s, lt);
   else drawPoint(ctx, env, s, lt);
   ctx.restore();
-  drawSubs(ctx, env, s, t, s.shotKey && env.shots[s.shotKey] ? COL.cx : W / 2);
+  const vz = s.visual && VISUALS[s.visual.type];
+  if (vz) {
+    const T = (f) => (s.voiceAt - s.start) + s.voiceDur * f;
+    ctx.save(); ctx.globalAlpha = clamp(inn * (1 - out), 0, 1); ctx.translate((1 - inn) * 120, 0);
+    vz(ctx, env.F, lt, T, s.visual);
+    ctx.restore();
+  }
+  const side = (s.shotKey && env.shots[s.shotKey]) || vz;
+  drawSubs(ctx, env, s, t, side ? COL.cx : W / 2);
   drawHud(ctx, env, s, t);
 }
 
@@ -256,28 +345,54 @@ async function render(env, tl, out) {
   ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
   ff.stdin.on('error', () => {});
   const frames = Math.ceil(tl.total * FPS);
-  let i = 0;
+  let i = 0, bi = -1, reader = null;
   for (let f = 0; f < frames; f++) {
     const t = f / FPS;
     while (i < tl.scenes.length - 1 && t >= tl.scenes[i].start + tl.scenes[i].dur) i++;
+    if (i !== bi) {
+      if (reader) reader.close();
+      reader = null; bi = i;
+      const sc = tl.scenes[i];
+      if (sc.broll && env.brolls[sc.broll]) reader = new Broll(env.brolls[sc.broll], sc.broll_start || 1);
+    }
+    env.brollFrame = reader ? await reader.next() : null;
     drawFrame(ctx, env, tl, i, t);
     const img = ctx.getImageData(0, 0, W, H);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
     if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
     if (f % 600 === 0) console.log('image ' + f + ' / ' + frames);
   }
+  if (reader) reader.close();
   ff.stdin.end();
   const [code] = await once(ff, 'close');
   if (code !== 0) throw new Error('Encodage vidéo échoué : ' + errTail.slice(-300));
 }
 
-function events(tl) {
+function events(tl, env) {
   const ev = [];
   tl.scenes.forEach((s) => {
     if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
     if (s.kind === 'chapter') ev.push({ name: 'rise', at: s.start - 0.4, vol: 0.3 }, { name: 'impact', at: s.start + 0.35, vol: 0.55 });
     if (s.kind === 'point') ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.35 });
-    if (s.screen && s.screen.click) ev.push({ name: 'ding', at: s.start + s.dur * 0.5, vol: 0.3 });
+    const T = (f) => (s.voiceAt - s.start) + s.voiceDur * f;
+    if (s.kind === 'chapter') ev.push({ name: typeDur(s.title) < 1 ? 'keys_s' : 'keys', at: s.start + 0.35, vol: 0.35 });
+    if (s.kind === 'point' && s.title) ev.push({ name: typeDur(s.title) < 1 ? 'keys_s' : 'keys', at: s.start + 0.15, vol: 0.3 });
+    const nb = (s.bullets || []).length;
+    for (let b = 0; b < nb; b++) ev.push({ name: 'pop', at: s.start + T(0) + 0.3 + s.voiceDur * 0.8 * (b / nb), vol: 0.35 });
+    if (s.visual && VISUALS[s.visual.type]) for (const [name, at] of visualSfx(s.visual.type, T)) ev.push({ name, at: s.start + at, vol: name === 'key' ? 0.35 : 0.4 });
+    if (s.shotKey && env.shots[s.shotKey]) {
+      const shot = env.shots[s.shotKey];
+      stepTimes(shot, s.shotScreen, s.dur).forEach((x, k) => {
+        if (x < 0) return;
+        const ty = shot.stills[k].type;
+        if (ty === 'click') ev.push({ name: 'tap', at: s.start + x - 0.05, vol: 0.45 });
+        if (ty === 'key') ev.push({ name: 'key', at: s.start + x, vol: 0.4 });
+      });
+    }
+    if (s.kind === 'cta') {
+      const t0 = T(0.12), tType = 'alvecapital.fr'.length / 12, tTap = t0 + tType + 1.3;
+      ev.push({ name: 'keys', at: s.start + t0, vol: 0.4 }, { name: 'pop', at: s.start + t0 + tType + 0.3, vol: 0.4 }, { name: 'tap', at: s.start + tTap - 0.05, vol: 0.5 }, { name: 'ding', at: s.start + tTap + 0.1, vol: 0.45 });
+    }
     if (s.kind === 'outro') ev.push({ name: 'ding', at: s.start + 0.4, vol: 0.45 });
   });
   return ev;
@@ -338,11 +453,28 @@ export async function runLong(job, DIR) {
     bg: await loadImg((job.backgrounds || [])[0]), logo: await loadImg(job.logo_url),
   };
   if (!env.logo) throw new Error('Logo du site introuvable');
+  // Plans d'illustration (bibliothèque du site) téléchargés une seule fois.
+  env.brolls = {};
+  const urls = [...new Set(tl.scenes.map((s) => s.broll).filter(Boolean))];
+  for (const [k, u] of urls.entries()) {
+    const f = join(DIR, 'broll' + k + '.mp4');
+    try { await download(u, f); env.brolls[u] = f; } catch (e) { console.error('Plan d’illustration indisponible : ' + u); }
+  }
+  console.log('Plans d’illustration : ' + Object.keys(env.brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
   await render(env, tl, video);
   await makeSfx(DIR, tl.total);
-  await mixAudio(DIR, tl, vo.files, events(tl), audio);
+  if (job.music_url) {
+    // Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
+    try {
+      const mp3 = join(DIR, 'music_src.mp3');
+      await download(job.music_url, mp3);
+      await run('ffmpeg', ['-y', '-stream_loop', '-1', '-i', mp3, '-t', String(tl.total + 1), '-af', 'volume=0.32,afade=t=in:d=2,afade=t=out:st=' + Math.max(0, tl.total - 3) + ':d=3', '-ar', '44100', '-ac', '2', join(DIR, 'music.wav')]);
+      console.log('Musique de fond : bibliothèque');
+    } catch (e) { console.error('Musique de la bibliothèque indisponible, musique générée utilisée'); }
+  }
+  await mixAudio(DIR, tl, vo.files, events(tl, env), audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
   const { out } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', final]);
   const info = JSON.parse(out);
