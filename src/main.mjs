@@ -92,17 +92,36 @@ async function main() {
   if (!review.ok) throw new Error('Relecture : ' + review.issues.join(' ; '));
   console.log('Relecture visuelle OK');
 
-  const size = statSync(final).size;
-  const init = await api('upload_init', { video_size: size });
-  if (init.dry_run) { console.log('Montage d’essai : aucun envoi'); await api('done'); return; }
-  const put = await fetch(init.upload_url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(size), 'Content-Range': 'bytes 0-' + (size - 1) + '/' + size },
-    body: readFileSync(final),
-  });
-  if (!put.ok) throw new Error('TikTok a refusé le fichier (' + put.status + ') ' + (await put.text()).slice(0, 200));
-  await api('done', { publish_id: init.publish_id });
-  console.log('Vidéo envoyée dans les brouillons TikTok');
+  const size = statSync(final).size, file = readFileSync(final);
+  const targets = job.targets || ['tiktok', 'youtube'];
+  const res = {};
+  if (targets.includes('tiktok')) {
+    try {
+      const init = await api('upload_init', { video_size: size });
+      if (init.dry_run) { console.log('Montage d\u2019essai : aucun envoi'); await api('done'); return; }
+      const put = await fetch(init.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(size), 'Content-Range': 'bytes 0-' + (size - 1) + '/' + size },
+        body: file,
+      });
+      if (!put.ok) throw new Error('TikTok a refus\u00e9 le fichier (' + put.status + ') ' + (await put.text()).slice(0, 200));
+      res.publish_id = init.publish_id;
+      console.log('Vid\u00e9o envoy\u00e9e dans les brouillons TikTok');
+    } catch (e) { res.tiktok_error = String((e && e.message) || e); console.error('TikTok : ' + res.tiktok_error); }
+  }
+  if (targets.includes('youtube')) {
+    try {
+      const yt = await api('youtube_init', { video_size: size });
+      if (yt.dry_run) { console.log('Montage d\u2019essai : aucun envoi'); await api('done'); return; }
+      const put = await fetch(yt.upload_url, { method: 'PUT', headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(size) }, body: file });
+      const j = await put.json().catch(() => ({}));
+      if (!put.ok || !j.id) throw new Error('YouTube a refus\u00e9 le fichier (' + put.status + ') ' + JSON.stringify(j).slice(0, 200));
+      res.youtube_id = j.id;
+      console.log('Short YouTube en ligne : https://youtube.com/shorts/' + j.id + ' (' + (j.status && j.status.privacyStatus) + ')');
+    } catch (e) { res.youtube_error = String((e && e.message) || e); console.error('YouTube : ' + res.youtube_error); }
+  }
+  if (!res.publish_id && !res.youtube_id) throw new Error([res.tiktok_error && 'TikTok : ' + res.tiktok_error, res.youtube_error && 'YouTube : ' + res.youtube_error].filter(Boolean).join(' \u2014 ') || 'Aucune plateforme vis\u00e9e');
+  await api('done', res);
 }
 
 main().catch(async (e) => {
