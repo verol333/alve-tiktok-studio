@@ -148,7 +148,7 @@ function outcomes(ctx, F, lt, T, v) {
     ctx.shadowColor = rgba(G, 0.6); ctx.shadowBlur = 50;
     ctx.fillStyle = G; rr(ctx, -250, -95, 500, 190, 40); ctx.fill(); ctx.shadowBlur = 0;
     tx(ctx, '+' + fr(min) + ' F', 0, 20, 110, F.display, '#0A0F1E', 'center');
-    tx(ctx, 'MINIMUM GARANTI', 0, 70, 30, F.xb, '#0A0F1E', 'center');
+    tx(ctx, (v.min_label || 'MINIMUM GARANTI'), 0, 70, 30, F.xb, '#0A0F1E', 'center');
     ctx.restore();
   }
 }
