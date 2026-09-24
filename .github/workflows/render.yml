@@ -16,7 +16,7 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Masquer le jeton
         run: echo "::add-mask::${{ inputs.token }}"
@@ -30,6 +30,8 @@ jobs:
       - name: ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
       - run: npm install --no-audit --no-fund
+      - name: Navigateur (vrais écrans du site)
+        run: npx playwright install --with-deps chromium > /dev/null
       - name: Cache du clonage de voix
         uses: actions/cache@v4
         with:
