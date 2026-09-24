@@ -391,7 +391,7 @@ export async function buildReel(job, DIR) {
   const tl = buildTimeline(job.scenes, vo.durs);
   fitToClips(tl, walk.segs);
   console.log('Vidéo TikTok : ' + tl.scenes.length + ' scènes, ' + tl.total.toFixed(1) + ' s');
-  if (tl.total < 15 || tl.total > 150) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
+  if (tl.total < 15 || tl.total > 180) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
   const r = seeded(11);
   const env = {
     F: await loadFonts(DIR), total: tl.total, walk: walk.file, brolls: {},
@@ -399,6 +399,8 @@ export async function buildReel(job, DIR) {
     bg: await loadImg((job.backgrounds || [])[0]), logo: await loadImg(job.logo_url),
   };
   if (!env.logo) throw new Error('Logo du site introuvable');
+  // Logos des opérateurs pour le schéma « scan en temps réel ».
+  for (const s of tl.scenes) if (s.visual && s.visual.logos) s.visual._imgs = await Promise.all(s.visual.logos.map((b) => loadImg(b.logo).catch(() => null)));
   const urls = [...new Set(tl.scenes.map((s) => s.broll).filter(Boolean))];
   for (const [k, u] of urls.entries()) {
     const f = join(DIR, 'broll' + k + '.mp4');
