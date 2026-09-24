@@ -100,7 +100,8 @@ async function main() {
     // Montage d'essai : version allégée de la vidéo complète, à regarder dans l'appli.
     const prev = join(DIR, 'preview.mp4');
     await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', prev]);
-    await api('preview', { video: readFileSync(prev).toString('base64'), voice: cloned ? 'clone' : 'henri' }).catch((e) => console.error('Aperçu : ' + e.message));
+    const b64 = readFileSync(prev).toString('base64'), voice = cloned ? 'clone' : 'henri';
+    await api('preview', { video: b64, voice }).catch(() => api('preview', { audio: b64, voice })).catch((e) => console.error('Aperçu : ' + e.message));
   }
 
   const metrics = await checks(final, tl, audio);
