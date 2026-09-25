@@ -44,6 +44,30 @@ function cursorScript() {
   setInterval(make, 400);
 }
 
+// Masque les numéros de téléphone et adresses mail affichés par le site.
+function maskScript() {
+  const PHONE = /(?:\+|00)\d[\d\s.-]{7,}\d|\b(?:0\d|2\d\d)\d(?:[\s.-]?\d){6,}\b/g;
+  const MAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+  const fix = (n) => {
+    const v = n.nodeValue;
+    if (!v || v.length < 8) return;
+    const w = v.replace(MAIL, (m) => (m === 'exemple@gmail.com' ? m : 'compte@exemple.com')).replace(PHONE, '+242 XX XXX XX XX');
+    if (w !== v) n.nodeValue = w;
+  };
+  const sweep = (root) => {
+    if (!root) return;
+    if (root.nodeType === 3) { fix(root); return; }
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+    while ((n = tw.nextNode())) fix(n);
+  };
+  const start = () => {
+    sweep(document.body);
+    new MutationObserver((ms) => { for (const m of ms) { if (m.type === 'characterData') fix(m.target); else m.addedNodes.forEach(sweep); } })
+      .observe(document.body, { subtree: true, childList: true, characterData: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+}
+
 async function smoothScroll(page, to, ms) {
   await page.evaluate(([to, ms]) => new Promise((res) => {
     const from = window.scrollY, t0 = performance.now();
@@ -94,6 +118,16 @@ async function act(page, a, mark) {
     return;
   }
   if (a.press) { await page.keyboard.press(a.press); await wait(a.wait || 900); return; }
+  // Centre l'élément à l'écran (y compris dans un panneau qui défile), curseur dessus.
+  if (a.center) {
+    const loc = await locate(page, a.soft ? { ...a.center, timeout: 6000 } : a.center);
+    await loc.evaluate((e) => (e.closest('[data-arb-key]') || e).scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    await wait(1300);
+    const box = await loc.boundingBox();
+    if (box) await moveTo(page, box.x + box.width / 2, box.y + Math.min(box.height / 2, 60), 700);
+    await wait(a.wait || 600);
+    return;
+  }
   const target = a.tap || a.point || (a.fill ? (typeof a.fill === 'string' ? { placeholder: a.fill } : a.fill) : null);
   if (!target) { await wait(a.wait || 500); return; }
   const loc = await locate(page, a.soft ? { ...target, timeout: 5000 } : target);
@@ -126,6 +160,7 @@ export async function recordWalkthrough(job, dir) {
   });
   await ctx.addInitScript(initScript, job.site_token);
   await ctx.addInitScript(cursorScript);
+  await ctx.addInitScript(maskScript);
   const page = await ctx.newPage();
   const T0 = Date.now(), now = () => (Date.now() - T0) / 1000;
   const segs = {};

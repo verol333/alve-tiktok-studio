@@ -29,6 +29,8 @@ jobs:
           python-version: '3.11'
       - name: ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - name: Reconnaissance vocale (calage des sous-titres)
+        run: pip install -q faster-whisper
       - run: npm install --no-audit --no-fund
       - name: Navigateur (vrais écrans du site)
         run: npx playwright install --with-deps chromium > /dev/null

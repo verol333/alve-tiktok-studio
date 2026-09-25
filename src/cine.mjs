@@ -110,6 +110,60 @@ function flashAt(ctx, lt, at, a) {
   if (f > 0) { ctx.fillStyle = 'rgba(255,255,255,' + a * f + ')'; ctx.fillRect(0, 0, W, H); }
 }
 
+// ── Logos des bookmakers : toujours posés sur une plaque contrastée ──
+// (le « 1X » blanc de 1xBet disparaissait sur fond blanc).
+const darkLogo = new Map();
+function logoIsDark(im) {
+  if (!im) return false;
+  if (darkLogo.has(im)) return darkLogo.get(im);
+  let dark = false;
+  try {
+    const c = createCanvas(64, 64), g = c.getContext('2d');
+    drawFit(g, im, 32, 32, 64, 64);
+    const d = g.getImageData(0, 0, 64, 64).data;
+    let sum = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 140) continue; sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n++; }
+    dark = n > 60 && sum / n < 0.4;
+  } catch (e) { dark = false; }
+  darkLogo.set(im, dark);
+  return dark;
+}
+function logoPlate(ctx, im, x, y, w, h, r) {
+  const light = logoIsDark(im);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10;
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  if (light) { g.addColorStop(0, '#FFFFFF'); g.addColorStop(1, '#EEF1F7'); } else { g.addColorStop(0, '#1E2940'); g.addColorStop(1, '#0D1322'); }
+  ctx.fillStyle = g; rr(ctx, x, y, w, h, r); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = light ? 'rgba(11,16,32,0.10)' : 'rgba(255,255,255,0.12)'; ctx.lineWidth = 2; rr(ctx, x, y, w, h, r); ctx.stroke();
+  drawFit(ctx, im, x + w / 2, y + h / 2, w * 0.74, h * 0.6);
+}
+// Flèche animée : la courbe se trace, la pointe suit, puis des jetons circulent.
+function flowArrow(ctx, x0, y0, x1, y1, p, lt, color) {
+  if (p <= 0) return;
+  const q = easeOut(clamp(p, 0, 1));
+  const pt = (u) => [(1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * x1 + u * u * x1, (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * y0 + u * u * y1];
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.shadowColor = rgba(color, 0.5); ctx.shadowBlur = 18;
+  ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.beginPath();
+  for (let k = 0; k <= 40; k++) { const [x, y] = pt((q * k) / 40); if (!k) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.stroke();
+  ctx.restore();
+  const [tx, ty] = pt(q), [bx, by] = pt(Math.max(0, q - 0.02));
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(Math.atan2(ty - by, tx - bx));
+  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-14, -15); ctx.lineTo(-7, 0); ctx.lineTo(-14, 15); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  if (q >= 0.999) for (let d = 0; d < 3; d++) {
+    const u = (lt * 0.55 + d / 3) % 1, [x, y] = pt(u);
+    ctx.save(); ctx.globalAlpha *= 0.9 * Math.sin(Math.PI * u);
+    ctx.shadowColor = rgba(color, 0.9); ctx.shadowBlur = 14; ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+}
+const booksStep = (s, n) => Math.min(0.22, (s.voiceDur * 0.6) / Math.max(1, n));
+
 // ── Texte cinétique : les mots apparaissent au moment où Henri les dit ──
 function groupsOf(s, chars) {
   s._kg = s._kg || {};
@@ -268,12 +322,7 @@ export const LOOKS = {
     ctx.save(); ctx.translate(520, 560); ctx.scale(Math.max(0.01, a), Math.max(0.01, a));
     txt(ctx, fr(L.odd), 0, 100, 300, env.F.display, INK); ctx.restore();
     const b = rest ? 1 : easeOut(prog(lt, T(s, 0.3), 0.4));
-    if (b > 0) {
-      ctx.strokeStyle = INK; ctx.lineWidth = 8; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(830, 540); ctx.lineTo(830 + 170 * b, 540); ctx.stroke();
-      if (b > 0.9) { ctx.beginPath(); ctx.moveTo(1000, 540); ctx.lineTo(975, 515); ctx.moveTo(1000, 540); ctx.lineTo(975, 565); ctx.stroke(); }
-      ctx.lineCap = 'butt';
-    }
+    if (b > 0) flowArrow(ctx, 830, 540, 1010, 540, b, lt, '#4F46E5');
     const gx = 1380, gy = 540, R = 220, a0 = -Math.PI / 2;
     const f = rest ? L.pct / 100 : (easeOut(prog(lt, T(s, 0.35), 0.9)) * L.pct) / 100;
     ctx.lineWidth = 46;
@@ -306,10 +355,8 @@ export const LOOKS = {
       const cx = W / 2 + (i ? 1 : -1) * 400;
       ctx.save(); ctx.translate(cx, cy + (1 - clamp(a, 0, 1)) * 120); ctx.globalAlpha *= clamp(a, 0, 1);
       card(ctx, -cw / 2, -ch / 2, cw, ch, 32, '#FFFFFF', 'rgba(15,23,42,0.16)');
-      ctx.fillStyle = 'rgba(11,16,32,0.04)'; rr(ctx, -cw / 2 + 24, -ch / 2 + 24, cw - 48, 130, 22); ctx.fill();
-      drawFit(ctx, img(env, c.logo), 0, -ch / 2 + 89, 320, 90);
-      txt(ctx, c.name, 0, -ch / 2 + 200, 28, env.F.sb, MUTE_D);
-      fitTxt(ctx, c.label, 0, 20, 42, 26, cw - 80, env.F.xb, INK);
+      logoPlate(ctx, img(env, c.logo), -cw / 2 + 24, -ch / 2 + 24, cw - 48, 130, 22);
+      fitTxt(ctx, c.label, 0, 30, 42, 26, cw - 80, env.F.xb, INK);
       const v = 1 + (c.odd - 1) * easeOut(prog(lt, at + 0.25, 0.7));
       ctx.shadowColor = rgba(acc, 0.25); ctx.shadowBlur = 30;
       txt(ctx, fr(v), 0, 165, 150, env.F.display, acc); ctx.shadowBlur = 0;
@@ -318,13 +365,14 @@ export const LOOKS = {
     const at2 = T(s, ((L.at || [0.3, 0.65])[1]) || 0.65) + 0.6, nb = easeBack(prog(lt, at2, 0.4));
     if (nb > 0) {
       ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(W / 2, cy, Math.max(1, 56 * nb), 0, Math.PI * 2); ctx.fill();
-      txt(ctx, '≠', W / 2, cy + 28 * nb, 80 * nb, env.F.display, '#FFFFFF');
+      ctx.save(); ctx.translate(W / 2, cy); ctx.scale(nb, nb); ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-20, -9); ctx.lineTo(20, -9); ctx.moveTo(-20, 9); ctx.lineTo(20, 9); ctx.moveTo(10, -24); ctx.lineTo(-10, 24); ctx.stroke(); ctx.restore();
     }
     if (L.sum && (L.cards || []).length === 2) {
       const q = easeOut(prog(lt, T(s, 0.93), 0.5));
       if (q > 0) {
         const pct = Math.round((1 / L.cards[0].odd + 1 / L.cards[1].odd) * 1000) / 10;
-        const line = 'Probabilités cumulées : ' + String(pct).replace('.', ',') + ' %  →  moins de 100 % = profit garanti';
+        const line = 'Probabilités cumulées : ' + String(pct).replace('.', ',') + ' %. Moins de 100 % : l\'écart est exploitable';
         ctx.save(); ctx.globalAlpha *= q; font(ctx, 30, env.F.xb); const w = ctx.measureText(line).width + 80;
         ctx.fillStyle = rgba(GREEN, 0.14); rr(ctx, W / 2 - w / 2, 822, w, 70, 35); ctx.fill();
         txt(ctx, line, W / 2, 868, 30, env.F.xb, '#047857'); ctx.restore();
@@ -344,20 +392,12 @@ export const LOOKS = {
     const cw = 640, ch = 300, cy = 450;
     (L.legs || []).forEach((l, i) => {
       const t0 = at[1 + i], cx = W / 2 + (i ? 1 : -1) * 420;
-      const pl = easeOut(prog(lt, t0 - 0.4, 0.5));
-      if (pl > 0) {
-        ctx.strokeStyle = GREEN; ctx.lineWidth = 6; ctx.beginPath();
-        const N = 24; for (let k = 0; k <= N * pl; k++) {
-          const u = k / N, x = W / 2 + (cx - W / 2) * u, y = 208 + (cy - ch / 2 - 208) * (u * u);
-          if (!k) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
+      flowArrow(ctx, W / 2 + (i ? 1 : -1) * 150, 208, cx, cy - ch / 2 - 18, prog(lt, t0 - 0.5, 0.6), lt, GREEN);
       const ca = easeBack(prog(lt, t0 - 0.1, 0.5));
       if (ca > 0) {
         ctx.save(); ctx.translate(cx, cy); ctx.globalAlpha *= clamp(ca, 0, 1); ctx.scale(0.9 + 0.1 * clamp(ca, 0, 1), 0.9 + 0.1 * clamp(ca, 0, 1));
         card(ctx, -cw / 2, -ch / 2, cw, ch, 30, '#FFFFFF', 'rgba(15,23,42,0.16)');
-        drawFit(ctx, img(env, l.logo), 0, -ch / 2 + 62, 260, 70);
+        logoPlate(ctx, img(env, l.logo), -160, -ch / 2 + 18, 320, 88, 20);
         fitTxt(ctx, l.label + '  ·  ' + fr(l.odd), 0, -ch / 2 + 150, 32, 22, cw - 60, env.F.xb, MUTE_D);
         const v = l.stake * easeOut(prog(lt, t0, 0.8));
         txt(ctx, money(v) + ' F', 0, ch / 2 - 40, 96, env.F.display, INK);
@@ -378,7 +418,7 @@ export const LOOKS = {
       ctx.save(); ctx.translate(W / 2, 858); ctx.scale(Math.max(0.01, pa), Math.max(0.01, pa));
       const g = ctx.createLinearGradient(-380, 0, 380, 0); g.addColorStop(0, '#33D98E'); g.addColorStop(1, GREEN);
       ctx.shadowColor = rgba(GREEN, 0.45); ctx.shadowBlur = 40; ctx.fillStyle = g; rr(ctx, -380, -50, 760, 100, 50); ctx.fill(); ctx.shadowBlur = 0;
-      txt(ctx, '+' + money(L.profit) + ' FCFA garantis', 0, 18, 52, env.F.black, INK); ctx.restore();
+      txt(ctx, '+' + money(L.profit) + ' FCFA de bénéfice', 0, 18, 52, env.F.black, INK); ctx.restore();
     }
     return { light: true, subs: true };
   },
@@ -405,6 +445,121 @@ export const LOOKS = {
     }
     ctx.save(); ctx.globalAlpha *= easeOut(prog(lt, t0 + 0.6, 0.5));
     txt(ctx, L.sub || '', W / 2, 770, 40, env.F.sb, MUTE_L); ctx.restore();
+    return { subs: true };
+  },
+
+  books(ctx, env, s, lt, t) {
+    const L = s.look; bgMesh(ctx, s, t);
+    const list = L.logos || [], acc = hue(s)[0];
+    const a0 = easeOut(prog(lt, 0, 0.5));
+    ctx.save(); ctx.globalAlpha *= a0;
+    txt(ctx, L.kicker || 'NOS ROBOTS COMPARENT EN CONTINU', W / 2, 150 - (1 - a0) * 20, 30, env.F.xb, acc);
+    ctx.fillStyle = acc; ctx.fillRect(W / 2 - 70 * a0, 172, 140 * a0, 4);
+    ctx.restore();
+    const cols = 5, cw = 300, ch = 126, gx = 28, gy = 26, rows = Math.ceil(list.length / cols);
+    const y0 = 225 + (Math.max(0, 3 - rows) * (ch + gy)) / 2;
+    const t0 = T(s, 0.06), step = booksStep(s, list.length);
+    list.forEach((bk, i) => {
+      const r = Math.floor(i / cols), c = i % cols, n = Math.min(cols, list.length - r * cols);
+      const x = W / 2 - (n * cw + (n - 1) * gx) / 2 + c * (cw + gx), y = y0 + r * (ch + gy);
+      const a = easeBack(prog(lt, t0 + i * step, 0.45));
+      if (a <= 0) return;
+      ctx.save(); ctx.translate(x + cw / 2, y + ch / 2 + Math.sin(t * 1.3 + i) * 3);
+      const z = Math.max(0.01, 0.7 + 0.3 * a); ctx.scale(z, z); ctx.globalAlpha *= clamp(a, 0, 1);
+      logoPlate(ctx, img(env, bk.logo), -cw / 2, -ch / 2, cw, ch, 24);
+      ctx.restore();
+    });
+    const q = easeOut(prog(lt, t0 + list.length * step + 0.3, 0.5));
+    if (q > 0) {
+      const line = L.caption || list.length + ' bookmakers comparés';
+      ctx.save(); ctx.globalAlpha *= q; font(ctx, 38, env.F.xb);
+      const w = ctx.measureText(line).width + 90;
+      ctx.fillStyle = rgba(acc, 0.18); rr(ctx, W / 2 - w / 2, 800 + (1 - q) * 20, w, 80, 40); ctx.fill();
+      txt(ctx, line, W / 2, 853 + (1 - q) * 20, 38, env.F.xb, '#FFFFFF');
+      ctx.restore();
+    }
+    return { subs: true };
+  },
+
+  mail(ctx, env, s, lt, t) {
+    const L = s.look; bgLight(ctx, s, t);
+    const code = String(L.code || '482916'), t1 = T(s, 0.05), t2 = T(s, 0.45), t3 = T(s, 0.8), IND = '#4F46E5';
+    const a = easeBack(prog(lt, t1, 0.6));
+    if (a > 0) {
+      ctx.save(); ctx.translate(560, 500 + (1 - clamp(a, 0, 1)) * 300 + Math.sin(t * 1.1) * 5); ctx.rotate(-0.03); ctx.globalAlpha *= clamp(a, 0, 1);
+      card(ctx, -380, -250, 760, 500, 30, '#FFFFFF', 'rgba(15,23,42,0.18)');
+      ctx.save(); rr(ctx, -380, -250, 760, 500, 30); ctx.clip(); ctx.fillStyle = INK; ctx.fillRect(-380, -250, 760, 96); ctx.restore();
+      txt(ctx, 'AL VE CAPITAL', -330, -190, 30, env.F.display, '#FFFFFF', 'left');
+      fitTxt(ctx, 'à ' + (L.email || ''), 330, -190, 24, 16, 330, env.F.sb, MUTE_L, 'right');
+      txt(ctx, 'Ton code de confirmation', -330, -90, 36, env.F.xb, INK, 'left');
+      const sp = 96;
+      [...code].forEach((d, i) => txt(ctx, d, -(sp * (code.length - 1)) / 2 + i * sp, 60, 110, env.F.display, IND));
+      txt(ctx, 'Valable 10 minutes', -330, 170, 26, env.F.sb, MUTE_D, 'left');
+      ctx.restore();
+    }
+    const bx = 1380, by = 400, n = code.length, bw = 92, gap = 18, x0 = bx - (n * bw + (n - 1) * gap) / 2;
+    const ap = easeOut(prog(lt, t2 - 0.4, 0.5));
+    if (ap > 0) {
+      ctx.save(); ctx.globalAlpha *= ap;
+      txt(ctx, 'Saisis le code reçu', bx, by - 50, 34, env.F.xb, INK);
+      for (let i = 0; i < n; i++) {
+        const x = x0 + i * (bw + gap), fi = prog(lt, t2 + i * 0.22, 0.12), cur = lt > t2 + (i - 1) * 0.22 && fi <= 0;
+        card(ctx, x, by, bw, 120, 20, '#FFFFFF', 'rgba(15,23,42,0.1)');
+        ctx.strokeStyle = fi > 0 ? IND : cur ? rgba(IND, 0.6) : 'rgba(11,16,32,0.15)'; ctx.lineWidth = 4; rr(ctx, x, by, bw, 120, 20); ctx.stroke();
+        if (fi > 0) { ctx.save(); const z = 0.6 + 0.4 * easeBack(fi); ctx.translate(x + bw / 2, by + 60); ctx.scale(z, z); txt(ctx, code[i], 0, 26, 72, env.F.display, INK); ctx.restore(); }
+      }
+      ctx.restore();
+    }
+    const ok = easeBack(prog(lt, t3, 0.5));
+    if (ok > 0) {
+      ctx.save(); ctx.translate(bx, 700); ctx.scale(Math.max(0.01, ok), Math.max(0.01, ok));
+      const g = ctx.createLinearGradient(-300, 0, 300, 0); g.addColorStop(0, '#33D98E'); g.addColorStop(1, GREEN);
+      ctx.shadowColor = rgba(GREEN, 0.45); ctx.shadowBlur = 40; ctx.fillStyle = g; rr(ctx, -300, -56, 600, 112, 56); ctx.fill(); ctx.shadowBlur = 0;
+      txt(ctx, 'Compte créé  ✓', 0, 20, 54, env.F.black, INK);
+      ctx.restore();
+    }
+    return { light: true, subs: true };
+  },
+
+  login(ctx, env, s, lt, t) {
+    const L = s.look; bgMesh(ctx, s, t);
+    const acc = hue(s)[0];
+    (L.books || []).slice(0, 2).forEach((bk, i) => {
+      const t0 = T(s, i ? 0.45 : 0.05), cx = W / 2 + (i ? 1 : -1) * 430, cy = 470;
+      const a = easeBack(prog(lt, t0 - 0.2, 0.5));
+      if (a <= 0) return;
+      ctx.save(); ctx.translate(cx, cy + (1 - clamp(a, 0, 1)) * 120); ctx.globalAlpha *= clamp(a, 0, 1);
+      card(ctx, -360, -300, 720, 600, 32, '#161E31', 'rgba(0,0,0,0.5)');
+      logoPlate(ctx, img(env, bk.logo), -300, -270, 600, 110, 22);
+      const fld = (y, label, val, p0, dots) => {
+        txt(ctx, label, -300, y - 16, 24, env.F.sb, MUTE_L, 'left');
+        const on = lt > p0 - 0.2 && lt < p0 + 1.4;
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; rr(ctx, -300, y, 600, 84, 18); ctx.fill();
+        ctx.strokeStyle = rgba(acc, on ? 0.9 : 0.18); ctx.lineWidth = 3; rr(ctx, -300, y, 600, 84, 18); ctx.stroke();
+        const k = Math.floor(val.length * prog(lt, p0, Math.max(0.5, val.length * 0.06)));
+        if (dots) { ctx.fillStyle = '#FFFFFF'; for (let j = 0; j < k; j++) { ctx.beginPath(); ctx.arc(-266 + j * 30, y + 42, 8, 0, Math.PI * 2); ctx.fill(); } }
+        else txt(ctx, val.slice(0, k), -270, y + 56, 38, env.F.xb, '#FFFFFF', 'left');
+      };
+      fld(-100, 'Téléphone', L.phone || '+242 XX XXX XX XX', t0 + 0.3, false);
+      fld(50, 'Mot de passe', '12345678', t0 + 1.5, true);
+      const ok = easeBack(prog(lt, t0 + 2.3, 0.45));
+      if (ok > 0) {
+        ctx.save(); ctx.translate(0, 220); ctx.scale(Math.max(0.01, ok), Math.max(0.01, ok));
+        ctx.fillStyle = GREEN; rr(ctx, -300, -44, 600, 88, 44); ctx.fill();
+        txt(ctx, 'Connecté  ✓', 0, 16, 42, env.F.black, INK);
+        ctx.restore();
+      }
+      ctx.restore();
+    });
+    const q = easeOut(prog(lt, T(s, 0.9), 0.5));
+    if (q > 0) {
+      const line = 'Comptes reliés, mise automatique prête';
+      ctx.save(); ctx.globalAlpha *= q; font(ctx, 36, env.F.xb);
+      const w = ctx.measureText(line).width + 90;
+      ctx.fillStyle = rgba(acc, 0.18); rr(ctx, W / 2 - w / 2, 815, w, 78, 39); ctx.fill();
+      txt(ctx, line, W / 2, 867, 36, env.F.xb, '#FFFFFF');
+      ctx.restore();
+    }
     return { subs: true };
   },
 
@@ -436,6 +591,9 @@ export function lookSfx(s) {
   if (L.type === 'odds') (L.at || [0.3, 0.65]).forEach((f) => out.push(['whoosh', T(s, f), 0.35], ['pop', T(s, f) + 0.9, 0.35]));
   if (L.type === 'split') { const at = L.at || []; out.push(['whoosh', T(s, at[0] || 0), 0.3]); [1, 2, 3, 4].forEach((i) => at[i] != null && out.push(['pop', T(s, at[i]), 0.35])); if (at[5] != null) out.push(['ding', T(s, at[5]), 0.5]); }
   if (L.type === 'bigstat') out.push(['rise', 0, 0.3], ['ding', T(s, 0.02) + 1.2, 0.55]);
+  if (L.type === 'books') { out.push(['whoosh', 0, 0.3]); const n = (L.logos || []).length, st = booksStep(s, n); for (let i = 0; i < n; i += 2) out.push(['pop', T(s, 0.06) + i * st, 0.28]); }
+  if (L.type === 'mail') out.push(['whoosh', T(s, 0.05), 0.35], ['ding', T(s, 0.05) + 0.5, 0.35], ['keys', T(s, 0.45), 0.35], ['ding', T(s, 0.8), 0.5]);
+  if (L.type === 'login') [0.05, 0.45].forEach((f) => out.push(['whoosh', T(s, f) - 0.2, 0.3], ['keys', T(s, f) + 0.3, 0.3], ['ding', T(s, f) + 2.3, 0.4]));
   return out;
 }
 
@@ -444,7 +602,7 @@ export function lookImages(scenes) {
   const set = new Set();
   for (const s of scenes) {
     const L = s.look; if (!L) continue;
-    [L.home_logo, L.away_logo, ...(L.cards || []).map((c) => c.logo), ...(L.legs || []).map((l) => l.logo)].forEach((u) => u && set.add(u));
+    [L.home_logo, L.away_logo, ...(L.cards || []).map((c) => c.logo), ...(L.legs || []).map((l) => l.logo), ...(L.logos || []).map((b) => b.logo), ...(L.books || []).map((b) => b.logo)].forEach((u) => u && set.add(u));
   }
   return [...set];
 }

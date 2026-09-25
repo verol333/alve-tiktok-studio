@@ -20,6 +20,9 @@ import { loadShots, screenState, drawPhone, stepTimes } from './phone.mjs';
 import { Broll } from './broll.mjs';
 import { VISUALS, visualSfx } from './visuals.mjs';
 import { LOOKS, lookSfx, lookImages, finishFx } from './cine.mjs';
+import { Clip } from './clip.mjs';
+import { drawWalkPhone, CW, CH } from './walkPhone.mjs';
+import { alignScenes } from './align.mjs';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from './draw.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
@@ -320,14 +323,14 @@ function drawFrame(ctx, env, tl, i, t) {
     const lt = t - s.start;
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     const r = look(ctx, env, s, lt, t) || {};
-    if (r.phone) phone(ctx, env, tl, i, t);
+    if (r.phone) { if (s.seg) drawWalkPhone(ctx, env, s, lt, t, accentOf(s)); else phone(ctx, env, tl, i, t); }
     if (r.subs) drawSubs(ctx, env, s, t, W / 2);
     drawHud(ctx, env, s, t, r.light);
     finishFx(ctx, s, lt);
     return;
   }
   background(ctx, env, s, t);
-  phone(ctx, env, tl, i, t);
+  if (s.seg) drawWalkPhone(ctx, env, s, t - s.start, t, accentOf(s)); else phone(ctx, env, tl, i, t);
   const lt = t - s.start;
   const inn = easeOut(prog(lt, 0, 0.5)), out = prog(lt, s.dur - 0.3, 0.3);
   ctx.save();
@@ -346,7 +349,7 @@ function drawFrame(ctx, env, tl, i, t) {
     vz(ctx, env.F, lt, T, s.visual);
     ctx.restore();
   }
-  const side = (s.shotKey && env.shots[s.shotKey]) || vz;
+  const side = (s.shotKey && env.shots[s.shotKey]) || vz || s.seg;
   drawSubs(ctx, env, s, t, side ? COL.cx : W / 2);
   drawHud(ctx, env, s, t);
   finishFx(ctx, s, t - s.start);
@@ -393,7 +396,7 @@ export async function buildEnv(spec, DIR) {
     F: spec.F, total: spec.total, chapters: spec.chapters, marks: spec.marks, brolls: spec.brolls, brollDur: spec.brollDur || {},
     shots: await loadShots(spec.raw),
     particles: Array.from({ length: 50 }, () => ({ x: r() * W, y: r() * H, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
-    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo), imgs: {},
+    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo), imgs: {}, walk: spec.walk || null,
   };
   for (const u of spec.imgs || []) env.imgs[u] = await loadImg(u);
   if (!env.logo) throw new Error('Logo du site introuvable');
@@ -408,13 +411,14 @@ export async function renderSegment(env, tl, f0, f1, out) {
   let errTail = '';
   ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
   ff.stdin.on('error', () => {});
-  let i = 0, bi = -1, reader = null;
+  let i = 0, bi = -1, reader = null, clip = null;
   for (let f = f0; f < f1; f++) {
     const t = f / FPS;
     while (i < tl.scenes.length - 1 && t >= tl.scenes[i].start + tl.scenes[i].dur) i++;
     if (i !== bi) {
       if (reader) reader.close();
-      reader = null; bi = i;
+      if (clip) clip.close();
+      reader = null; clip = null; bi = i;
       const sc = tl.scenes[i], file = sc.broll && env.brolls[sc.broll];
       if (file) {
         // Segment commencé en cours de scène : le plan reprend au bon endroit.
@@ -423,8 +427,14 @@ export async function renderSegment(env, tl, f0, f1, out) {
         if (d > 2) at = at % (d - 0.5);
         reader = new Broll(file, at);
       }
+      // Scène filmée sur le site : l'extrait reprend au bon endroit.
+      if (sc.seg && env.walk) {
+        const off = Math.max(0, t - sc.start) * (sc.rate || 1);
+        clip = new Clip(env.walk, sc.seg.start + off, Math.max(0.3, sc.seg.end - sc.seg.start - off + 0.15), sc.rate || 1, CW, CH);
+      }
     }
     env.brollFrame = reader ? await reader.next() : null;
+    env.clipFrame = clip ? ((await clip.next()) || null) : null;
     drawFrame(ctx, env, tl, i, t);
     const img = ctx.getImageData(0, 0, W, H);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
@@ -432,6 +442,7 @@ export async function renderSegment(env, tl, f0, f1, out) {
     if ((f - f0) % 600 === 0) console.log('image ' + f + ' / ' + Math.ceil(tl.total * FPS) + ' — ' + mem());
   }
   if (reader) reader.close();
+  if (clip) clip.close();
   ff.stdin.end();
   const [code] = await once(ff, 'close');
   if (code !== 0) throw new Error('Encodage vidéo échoué : ' + errTail.slice(-300));
@@ -464,6 +475,11 @@ function events(tl, env) {
       ev.push({ name: 'keys', at: s.start + t0, vol: 0.4 }, { name: 'pop', at: s.start + t0 + tType + 0.3, vol: 0.4 }, { name: 'tap', at: s.start + tTap - 0.05, vol: 0.5 }, { name: 'ding', at: s.start + tTap + 0.1, vol: 0.45 });
     }
     if (s.kind === 'outro') ev.push({ name: 'ding', at: s.start + 0.4, vol: 0.45 });
+    if (s.seg) for (const e of s.seg.ev || []) {
+      const at = s.start + e.at / (s.rate || 1);
+      if (at < s.start + s.dur) ev.push({ name: e.type === 'key' ? 'key' : 'tap', at, vol: e.type === 'key' ? 0.35 : 0.45 });
+    }
+    if (s.seg && s.zoom) ev.push({ name: 'whoosh', at: s.start + s.dur * (s.zoom.at != null ? s.zoom.at : 0.4), vol: 0.22 });
   });
   return ev;
 }
@@ -496,13 +512,40 @@ export async function voices(job, DIR) {
   return { files, durs, voice: 'henri' };
 }
 
+// Scènes filmées : chaque scène dure au moins le temps de son extrait (accéléré
+// jusqu'à ×1,6) et tout ce qui suit est décalé d'autant.
+function fitWalk(tl, segs) {
+  let t = 0;
+  tl.scenes.forEach((s, i) => {
+    const d = t - s.start;
+    s.start = t; s.voiceAt += d;
+    const seg = segs && segs[i];
+    if (seg) {
+      const len = Math.max(0.5, seg.end - seg.start);
+      s.seg = seg; s.rate = 1;
+      if (len > s.dur) { s.rate = Math.min(1.6, len / s.dur); s.dur = Math.max(s.dur, len / s.rate); }
+    }
+    t += s.dur;
+  });
+  tl.total = t;
+  tl.scenes.forEach((s, i) => {
+    s.prevPhone = !!(s.seg && tl.scenes[i - 1] && tl.scenes[i - 1].seg);
+    s.nextPhone = !!(s.seg && tl.scenes[i + 1] && tl.scenes[i + 1].seg);
+  });
+}
+
 export async function runLong(job, DIR) {
   // 1) Les vrais écrans d'abord : une session expirée arrête tout de suite.
   const raw = await captureScreens(job, DIR);
   const shots = await loadShots(raw);
+  // Parcours FILMÉ en vidéo sur le vrai site (landing, inscription, menu, arbitrage, mise auto).
+  const { recordWalkthrough } = await import('./record.mjs');
+  const walk = await recordWalkthrough(job, DIR);
   // 2) La voix.
   const vo = await voices(job, DIR);
   const tl = buildTimeline(job.scenes, vo.durs);
+  await alignScenes(tl, vo.files, DIR);
+  fitWalk(tl, walk.segs);
   console.log('Vidéo longue : ' + tl.scenes.length + ' scènes, ' + tl.total.toFixed(1) + ' s');
   tl.scenes.forEach((s, i) => {
     if (s.screen && s.screen.path) { s.shotKey = screenKey(s.screen); s.shotScreen = s.screen; }
@@ -525,7 +568,7 @@ export async function runLong(job, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const spec = { F, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes) };
+  const spec = { F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes) };
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);

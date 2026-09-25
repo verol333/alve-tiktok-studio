@@ -20,6 +20,10 @@ export function initScript(tok) {
       'alve_invite_arb_prematch', 'alve_invite_arb_live', 'alve_invite_auto', 'alve_invite_mise_auto']) localStorage.setItem(k, now);
     localStorage.setItem('alve_push_v2_done', '1');
     localStorage.setItem('alve_failure_popup_v2_btts', '1');
+    // Messagerie ouverte d'office, avertissement live, rideau d'accueil : rien ne masque l'écran filmé.
+    sessionStorage.setItem('alve_msgs_shown', '1');
+    sessionStorage.setItem('alve_intro_seen', '1');
+    localStorage.setItem('alve_live_risk_never', '1');
   } catch (e) { /* rien */ }
 }
 
