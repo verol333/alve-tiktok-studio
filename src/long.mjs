@@ -68,7 +68,7 @@ function background(ctx, env, s, t) {
     ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
   });
   ctx.fillStyle = '#FFFFFF';
-  for (const p of env.particles) {
+  if (s.kind !== 'cta' && s.kind !== 'outro') for (const p of env.particles) {
     const y = (((p.y - t * p.v) % H) + H) % H;
     ctx.globalAlpha = p.a;
     ctx.beginPath(); ctx.arc(p.x + Math.sin(t + p.y) * 12, y, p.s, 0, Math.PI * 2); ctx.fill();
@@ -181,8 +181,7 @@ function drawChapter(ctx, env, s, lt) {
   const p = easeOut(prog(lt, 0, 0.7));
   font(ctx, 420, env.F.display); ctx.textAlign = 'left'; ctx.fillStyle = rgba(acc, 0.14 * p);
   ctx.fillText(String(s.chapter).padStart(2, '0'), 90 - (1 - p) * 80, 720);
-  font(ctx, 34, env.F.xb); ctx.fillStyle = acc; ctx.fillText('CHAPITRE ' + s.chapter, COL.x + 10, 420);
-  ctx.fillRect(COL.x + 10, 444, 260 * easeOut(prog(lt, 0.2, 0.8)), 7);
+  ctx.fillStyle = acc; ctx.fillRect(COL.x + 10, 444, 260 * easeOut(prog(lt, 0.2, 0.8)), 7);
   typedBlock(ctx, s.title, env.F.black, 112, 64, COL.w - 40, 2, COL.x + 10, 580, P.ink, lt, 0.35, acc);
   const sw = prog(lt, 0.1, 1.1);
   if (sw > 0 && sw < 1) {
@@ -194,7 +193,7 @@ function drawChapter(ctx, env, s, lt) {
 
 function drawPoint(ctx, env, s, lt) {
   const acc = accentOf(s);
-  const chip = 'CHAPITRE ' + s.chapter + ' · ' + String(env.chapters[s.chapter] || '').toUpperCase();
+  const chip = String(env.chapters[s.chapter] || s.title || '').toUpperCase();
   font(ctx, 24, env.F.xb);
   const cw = Math.min(COL.w, ctx.measureText(chip).width + 56);
   ctx.fillStyle = rgba(acc, 0.16); rr(ctx, COL.x, 130, cw, 52, 26); ctx.fill();
@@ -223,7 +222,33 @@ function drawPoint(ctx, env, s, lt) {
   });
 }
 
+// Carte de fin sobre : logo, nom, adresse du site dans une barre discrète.
 function drawOutro(ctx, env, s, lt) {
+  const a = easeOut(prog(lt, 0.05, 0.7));
+  ctx.save(); ctx.globalAlpha *= a; ctx.translate(0, (1 - a) * 24);
+  logo(ctx, env, W / 2, 290, 150, 0);
+  font(ctx, 84, env.F.display); ctx.textAlign = 'center'; ctx.fillStyle = P.ink;
+  ctx.fillText('AL VE CAPITAL', W / 2, 470);
+  ctx.restore();
+  const b = easeOut(prog(lt, 0.45, 0.7));
+  ctx.fillStyle = P.a; ctx.fillRect(W / 2 - 170 * b, 502, 340 * b, 4);
+  const c = easeOut(prog(lt, 0.75, 0.7));
+  ctx.save(); ctx.globalAlpha *= c; ctx.translate(0, (1 - c) * 18);
+  const bw = 620, bh = 92, bx = W / 2 - bw / 2, by = 570;
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; rr(ctx, bx, by, bw, bh, 46); ctx.fill();
+  ctx.strokeStyle = rgba(P.a, 0.5); ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = P.a; ctx.beginPath(); ctx.arc(bx + 58, by + bh / 2, 9, 0, Math.PI * 2); ctx.fill();
+  font(ctx, 48, env.F.xb); ctx.textAlign = 'center'; ctx.fillStyle = '#FFFFFF';
+  ctx.fillText('alvecapital.fr', W / 2 + 18, by + 62);
+  ctx.restore();
+  const d = easeOut(prog(lt, 1.15, 0.7));
+  ctx.save(); ctx.globalAlpha *= d;
+  font(ctx, 30, env.F.sb); ctx.textAlign = 'center'; ctx.fillStyle = P.mute;
+  ctx.fillText('Compte gratuit  ·  18+  ·  Joue toujours de façon responsable', W / 2, 770);
+  ctx.restore();
+}
+
+function drawOutroOld(ctx, env, s, lt) {
   const p0 = easeBack(prog(lt, 0.05, 0.8));
   ctx.save(); ctx.translate(W / 2, 220); const z0 = Math.max(0.01, p0); ctx.scale(z0, z0);
   logo(ctx, env, 0, 0, 200, 40); ctx.restore();
@@ -477,7 +502,7 @@ function events(tl, env) {
     if (s.kind === 'outro') ev.push({ name: 'ding', at: s.start + 0.4, vol: 0.45 });
     if (s.seg) for (const e of s.seg.ev || []) {
       const at = s.start + e.at / (s.rate || 1);
-      if (at < s.start + s.dur) ev.push({ name: e.type === 'key' ? 'key' : 'tap', at, vol: e.type === 'key' ? 0.35 : 0.45 });
+      if (at < s.start + s.dur) ev.push({ name: e.type === 'key' ? 'key' : e.type === 'ring' ? 'pop' : 'tap', at, vol: e.type === 'key' ? 0.35 : e.type === 'ring' ? 0.3 : 0.45 });
     }
     if (s.seg && s.zoom) ev.push({ name: 'whoosh', at: s.start + s.dur * (s.zoom.at != null ? s.zoom.at : 0.4), vol: 0.22 });
   });
@@ -523,7 +548,7 @@ function fitWalk(tl, segs) {
     if (seg) {
       const len = Math.max(0.5, seg.end - seg.start);
       s.seg = seg; s.rate = 1;
-      if (len > s.dur) { s.rate = Math.min(1.6, len / s.dur); s.dur = Math.max(s.dur, len / s.rate); }
+      if (len > s.dur) s.dur = len; // jamais accéléré : la scène s'allonge si besoin
     }
     t += s.dur;
   });
@@ -539,12 +564,15 @@ export async function runLong(job, DIR) {
   const raw = await captureScreens(job, DIR);
   const shots = await loadShots(raw);
   // Parcours FILMÉ en vidéo sur le vrai site (landing, inscription, menu, arbitrage, mise auto).
-  const { recordWalkthrough } = await import('./record.mjs');
-  const walk = await recordWalkthrough(job, DIR);
-  // 2) La voix.
+  // 2) La voix d'abord : le parcours est ensuite filmé au rythme exact de chaque mot.
   const vo = await voices(job, DIR);
   const tl = buildTimeline(job.scenes, vo.durs);
   await alignScenes(tl, vo.files, DIR);
+  const nw = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  const plan = {};
+  tl.scenes.forEach((s, i) => { if (s.walk) plan[i] = { dur: s.dur, words: (s.words || []).map((w) => ({ n: nw(w.text), t: (s.voiceAt - s.start) + w.start * s.voiceDur })) }; });
+  const { recordWalkthrough } = await import('./record.mjs');
+  const walk = await recordWalkthrough(job, DIR, plan);
   fitWalk(tl, walk.segs);
   console.log('Vidéo longue : ' + tl.scenes.length + ' scènes, ' + tl.total.toFixed(1) + ' s');
   tl.scenes.forEach((s, i) => {
