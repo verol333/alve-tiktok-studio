@@ -157,7 +157,17 @@ async function deliver(job, final, tl, audio, type, voice) {
       console.log('Short YouTube en ligne : https://youtube.com/shorts/' + j.id + ' (' + (j.status && j.status.privacyStatus) + ')');
     } catch (e) { res.youtube_error = String((e && e.message) || e); console.error('YouTube : ' + res.youtube_error); }
   }
-  if (!res.publish_id && !res.youtube_id) throw new Error([res.tiktok_error && 'TikTok : ' + res.tiktok_error, res.youtube_error && 'YouTube : ' + res.youtube_error].filter(Boolean).join(' \u2014 ') || 'Aucune plateforme vis\u00e9e');
+  if (targets.includes('facebook')) {
+    try {
+      // Facebook va chercher la vidéo : elle est déposée sur le dépôt du studio.
+      const { publishPreview } = await import('./long.mjs');
+      const fb = await api('facebook_publish', { video_url: await publishPreview(final) });
+      if (!fb.facebook_id) throw new Error(fb.error || 'aucun identifiant renvoyé');
+      res.facebook_id = fb.facebook_id;
+      console.log('Reel Facebook publié : ' + fb.facebook_id);
+    } catch (e) { res.facebook_error = String((e && e.message) || e); console.error('Facebook : ' + res.facebook_error); }
+  }
+  if (!res.publish_id && !res.youtube_id && !res.facebook_id) throw new Error([res.tiktok_error && 'TikTok : ' + res.tiktok_error, res.youtube_error && 'YouTube : ' + res.youtube_error, res.facebook_error && 'Facebook : ' + res.facebook_error].filter(Boolean).join(' \u2014 ') || 'Aucune plateforme vis\u00e9e');
   await api('done', res);
 }
 
