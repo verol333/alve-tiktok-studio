@@ -91,7 +91,7 @@ async function shoot(page, base, screen, dir, n) {
   let m = 0;
   const snap = async (type, step, tap) => { const f = join(dir, 'scr' + n + '_s' + (m++) + '.png'); await page.screenshot({ path: f }); out.stills.push({ file: f, type, step, tap: tap || null }); };
   for (const [k, st] of steps.entries()) {
-    if (st.click) {
+    if (st.click || st.css) {
       const target = st.css ? page.locator(st.css).locator('visible=true').first() : page.getByText(st.click, { exact: false }).first();
       await target.scrollIntoViewIfNeeded({ timeout: 20000 });
       // Carte d'opportunité centrée à l'écran (l'exemple montré dans la vidéo).
