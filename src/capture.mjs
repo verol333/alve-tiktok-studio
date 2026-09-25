@@ -4,7 +4,7 @@
 import { chromium } from 'playwright';
 import { join } from 'node:path';
 
-const VW = 390, VH = 844, DPR = 2, MAX_H = 5200;
+const VW = 390, VH = 844, DPR = 2, MAX_H = 9000;
 export const screenKey = (s) => [s.path, JSON.stringify(s.steps || s.click || '')].join('|');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -92,14 +92,20 @@ async function shoot(page, base, screen, dir, n) {
   const snap = async (type, step, tap) => { const f = join(dir, 'scr' + n + '_s' + (m++) + '.png'); await page.screenshot({ path: f }); out.stills.push({ file: f, type, step, tap: tap || null }); };
   for (const [k, st] of steps.entries()) {
     if (st.click) {
-      const target = page.getByText(st.click, { exact: false }).first();
-      await target.scrollIntoViewIfNeeded({ timeout: 8000 });
+      const target = st.css ? page.locator(st.css).locator('visible=true').first() : page.getByText(st.click, { exact: false }).first();
+      await target.scrollIntoViewIfNeeded({ timeout: 20000 });
+      // Carte d'opportunité centrée à l'écran (l'exemple montré dans la vidéo).
+      if (st.center) await target.evaluate((e) => (e.closest('[data-arb-key]') || e).scrollIntoView({ block: 'center' }));
       await wait(500);
       if (out.scroll_at_tap == null) out.scroll_at_tap = await page.evaluate(() => window.scrollY);
       const box = await target.boundingBox();
       await target.click({ timeout: 8000 });
       await wait(st.wait || 2600);
       await snap('click', k, box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null);
+    } else if (st.press) {
+      await page.keyboard.press(st.press);
+      await wait(st.wait || 1200);
+      await snap('settle', k);
     } else if (st.fill) {
       const input = page.getByPlaceholder(st.fill).first();
       if (out.scroll_at_tap == null) out.scroll_at_tap = await page.evaluate(() => window.scrollY);
