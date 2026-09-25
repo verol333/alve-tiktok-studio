@@ -4,7 +4,11 @@
 import { createCanvas } from '@napi-rs/canvas';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font } from './draw.mjs';
 
-const W = 1920, H = 1080;
+let W = 1920, H = 1080;
+// Format vertical (Reel 1080x1920) : les décors couvrent tout l'écran, le contenu
+// des looks est posé par long.mjs dans la zone centrale.
+let SW = 1920, SH = 1080, VERT = false;
+export function setStage(w, h) { SW = w; SH = h; VERT = h > w; }
 const INK = '#0B1020', PAPER = '#F4F6FB', MUTE_D = '#5B6478', MUTE_L = '#9AA4C6';
 const GREEN = '#10B981', RED = '#EF4444';
 const HUES = {
@@ -55,7 +59,7 @@ function bgBroll(ctx, env, s, lt, t) {
   const f = env.brollFrame;
   if (!f) return bgMesh(ctx, s, t);
   ctx.fillStyle = '#05070D'; ctx.fillRect(0, 0, W, H);
-  const z = 1.06 + 0.08 * prog(lt, 0, s.dur), w = W * z, h = H * z;
+  const z = 1.06 + 0.08 * prog(lt, 0, s.dur), kf = Math.max(W / f.width, H / f.height) * z, w = f.width * kf, h = f.height * kf;
   ctx.drawImage(f, (W - w) / 2, (H - h) / 2, w, h);
   ctx.fillStyle = 'rgba(5,7,13,0.58)'; ctx.fillRect(0, 0, W, H);
   const g = ctx.createLinearGradient(0, 0, W, H);
@@ -265,6 +269,15 @@ function teamsRow(ctx, env, L, y, dark, a) {
 }
 
 // ── Les looks ──
+// Décors plein écran : toujours dessinés sur tout l'écran, quel que soit le cadrage du contenu.
+const staged = (fn) => function (ctx, ...args) {
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const w0 = W, h0 = H; W = SW; H = SH;
+  try { return fn(ctx, ...args); } finally { W = w0; H = h0; ctx.restore(); }
+};
+vignette = staged(vignette); blobs = staged(blobs); bgMesh = staged(bgMesh); bgLight = staged(bgLight);
+bgBroll = staged(bgBroll); bars = staged(bars); flashAt = staged(flashAt);
+
 export const LOOKS = {
   kinetic(ctx, env, s, lt, t) {
     const L = s.look, bg = L.bg || 'mesh', light = bg === 'light';
@@ -278,7 +291,7 @@ export const LOOKS = {
       ctx.fillStyle = acc; ctx.fillRect(W / 2 - 60 * a, 212, 120 * a, 4);
       ctx.restore();
     }
-    textFlow(ctx, s, lt, t, { cx: W / 2, cy: H / 2 + 30, w: W - 360, size: 150, min: 84, lines: 2, fam: env.F.display, upper: true, color: light ? INK : '#FFFFFF', acc, chars: 26 });
+    textFlow(ctx, s, lt, t, Object.assign({ cx: W / 2, cy: H / 2 + 30, w: W - 360, size: 150, min: 84, lines: 2, fam: env.F.display, upper: true, color: light ? INK : '#FFFFFF', acc, chars: 26 }, VERT ? { w: 1160, min: 76, lines: 4, chars: 22 } : {}));
     return { light, subs: false };
   },
 
@@ -486,7 +499,7 @@ export const LOOKS = {
     txt(ctx, L.kicker || 'NOS ROBOTS COMPARENT EN CONTINU', W / 2, 150 - (1 - a0) * 20, 30, env.F.xb, acc);
     ctx.fillStyle = acc; ctx.fillRect(W / 2 - 70 * a0, 172, 140 * a0, 4);
     ctx.restore();
-    const cols = 5, cw = 300, ch = 126, gx = 28, gy = 26, rows = Math.ceil(list.length / cols);
+    const cols = VERT ? 3 : 5, cw = 300, ch = 126, gx = 28, gy = 26, rows = Math.ceil(list.length / cols);
     const y0 = 225 + (Math.max(0, 3 - rows) * (ch + gy)) / 2;
     const t0 = T(s, 0.06), step = booksStep(s, list.length);
     list.forEach((bk, i) => {
@@ -504,8 +517,8 @@ export const LOOKS = {
       const line = L.caption || list.length + ' bookmakers comparés';
       ctx.save(); ctx.globalAlpha *= q; font(ctx, 38, env.F.xb);
       const w = ctx.measureText(line).width + 90;
-      ctx.fillStyle = rgba(acc, 0.18); rr(ctx, W / 2 - w / 2, 800 + (1 - q) * 20, w, 80, 40); ctx.fill();
-      txt(ctx, line, W / 2, 853 + (1 - q) * 20, 38, env.F.xb, '#FFFFFF');
+      ctx.fillStyle = rgba(acc, 0.18); rr(ctx, W / 2 - w / 2, (VERT ? y0 + rows * (ch + gy) + 20 : 800) + (1 - q) * 20, w, 80, 40); ctx.fill();
+      txt(ctx, line, W / 2, (VERT ? y0 + rows * (ch + gy) + 73 : 853) + (1 - q) * 20, 38, env.F.xb, '#FFFFFF');
       ctx.restore();
     }
     return { subs: true };
@@ -596,6 +609,14 @@ export const LOOKS = {
   phone(ctx, env, s, lt, t) {
     const L = s.look; bgMesh(ctx, s, t);
     const acc = hue(s)[0];
+    if (VERT) {
+      // Vertical : étiquette et texte au-dessus, le téléphone filmé est posé dessous par long.mjs.
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (L.chip) { font(ctx, 30, env.F.xb); const cw = ctx.measureText(L.chip).width + 64; ctx.fillStyle = rgba(acc, 0.16); rr(ctx, SW / 2 - cw / 2, 196, cw, 60, 30); ctx.fill(); txt(ctx, L.chip, SW / 2, 237, 30, env.F.xb, acc); }
+      textFlow(ctx, s, lt, t, { cx: SW / 2, cy: 400, w: 960, size: 72, min: 46, lines: 3, fam: env.F.black, color: '#FFFFFF', acc, chars: 42, lh: 1.1 });
+      ctx.restore();
+      return { phone: true, subs: false };
+    }
     if (L.chip) {
       font(ctx, 24, env.F.xb); const cw = ctx.measureText(L.chip).width + 56;
       ctx.fillStyle = rgba(acc, 0.16); rr(ctx, 120, 150, cw, 52, 26); ctx.fill();
@@ -651,6 +672,6 @@ export function finishFx(ctx, s, lt) {
   if (patCtx !== ctx) { pat = ctx.createPattern(grain, 'repeat'); patCtx = ctx; }
   const ox = Math.floor(Math.random() * 256), oy = Math.floor(Math.random() * 256);
   ctx.save(); ctx.globalAlpha = 0.05; ctx.globalCompositeOperation = 'overlay';
-  ctx.translate(-ox, -oy); ctx.fillStyle = pat; ctx.fillRect(0, 0, W + 256, H + 256);
+  ctx.translate(-ox, -oy); ctx.fillStyle = pat; ctx.fillRect(0, 0, SW + 256, SH + 256);
   ctx.restore();
 }
