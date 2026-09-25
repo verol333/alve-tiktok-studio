@@ -106,8 +106,26 @@ async function main() {
   return deliver(job, final, tl, audio, env.type, cloned ? 'clone' : 'henri');
 }
 
+// Version Facebook : les Reels publiés par l'API sont limités à 90 s.
+// On retire les scènes marquées fb: false (tutoriel d'inscription).
+async function facebookCut(final, tl) {
+  const keep = tl.scenes.filter((s) => s.fb !== false);
+  if (keep.length === tl.scenes.length && tl.total <= 90) return final;
+  const out = join(DIR, 'facebook.mp4'), parts = [];
+  keep.forEach((s, i) => {
+    const a = s.start.toFixed(3), b = (s.start + s.dur).toFixed(3);
+    parts.push('[0:v]trim=' + a + ':' + b + ',setpts=PTS-STARTPTS[v' + i + ']');
+    parts.push('[0:a]atrim=' + a + ':' + b + ',asetpts=PTS-STARTPTS,afade=t=in:d=0.05,afade=t=out:st=' + Math.max(0, s.dur - 0.08).toFixed(3) + ':d=0.08[a' + i + ']');
+  });
+  parts.push(keep.map((_, i) => '[v' + i + '][a' + i + ']').join('') + 'concat=n=' + keep.length + ':v=1:a=1[v][a]');
+  await run('ffmpeg', ['-y', '-i', final, '-filter_complex', parts.join(';'), '-map', '[v]', '-map', '[a]', '-t', '89.5', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', out]);
+  console.log('Version Facebook : ' + (await duration(out)).toFixed(1) + ' s');
+  return out;
+}
+
 // Contrôles, relecture puis envoi (commun à tous les formats verticaux).
 async function deliver(job, final, tl, audio, type, voice) {
+  const fbFile = await facebookCut(final, tl).catch((e) => { console.error('Version Facebook : ' + e.message); return null; });
   if (job.dry_run) {
     // Montage d'essai : version allégée de la vidéo complète, à regarder dans l'appli.
     const prev = join(DIR, 'preview.mp4');
@@ -117,6 +135,11 @@ async function deliver(job, final, tl, audio, type, voice) {
       // Trop lourde pour un envoi direct : déposée sur le dépôt du studio.
       const { publishPreview } = await import('./long.mjs');
       await api('preview', { video_url: await publishPreview(prev), voice });
+      if (fbFile && fbFile !== final) {
+        const fprev = join(DIR, 'preview-fb.mp4');
+        await run('ffmpeg', ['-y', '-i', fbFile, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fprev]);
+        await api('preview', { video_url: await publishPreview(fprev), voice, cut: 'facebook' }).catch((e) => console.error('Aperçu Facebook : ' + e.message));
+      }
     } else {
       const b64 = readFileSync(prev).toString('base64');
       await api('preview', { video: b64, voice }).catch(() => api('preview', { audio: b64, voice })).catch((e) => console.error('Aperçu : ' + e.message));
@@ -161,7 +184,7 @@ async function deliver(job, final, tl, audio, type, voice) {
     try {
       // Facebook va chercher la vidéo : elle est déposée sur le dépôt du studio.
       const { publishPreview } = await import('./long.mjs');
-      const fb = await api('facebook_publish', { video_url: await publishPreview(final) });
+      const fb = await api('facebook_publish', { video_url: await publishPreview(fbFile || final) });
       if (!fb.facebook_id) throw new Error(fb.error || 'aucun identifiant renvoyé');
       res.facebook_id = fb.facebook_id;
       console.log('Reel Facebook publié : ' + fb.facebook_id);
