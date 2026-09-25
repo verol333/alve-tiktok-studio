@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { createCanvas } from '@napi-rs/canvas';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import { api, download } from './api.mjs';
 import { run, duration } from './sh.mjs';
 import { loadFonts, loadImg } from './assets.mjs';
@@ -371,24 +371,147 @@ async function segment(specFile, [f0, f1, out], k) {
   throw new Error('Segment ' + (k + 1) + ' impossible à monter');
 }
 
-// Reconstruit l'habillage dans le processus du segment.
+// Reconstruit l'habillage dans le processus du segment (polices déjà
+// téléchargées, écrans filmés relus depuis le disque).
 export async function buildEnv(spec, DIR) {
-  const fd = join(DIR, 'fonts-' + process.pid); mkdirSync(fd, { recursive: true });
+  for (const name of Object.values(spec.F)) GlobalFonts.registerFromPath(join(DIR, name + '.ttf'), name);
+  const r = seeded(7);
+  const env = {
+    F: spec.F, total: spec.total, chapters: spec.chapters, marks: spec.marks, brolls: spec.brolls, brollDur: spec.brollDur || {},
+    shots: await loadShots(spec.raw),
+    particles: Array.from({ length: 50 }, () => ({ x: r() * W, y: r() * H, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
+    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo),
+  };
+  if (!env.logo) throw new Error('Logo du site introuvable');
+  return env;
+}
+
+// Images f0 à f1 (exclue) de la vidéo, encodées dans le fichier out.
+export async function renderSegment(env, tl, f0, f1, out) {
+  const canvas = createCanvas(W, H), ctx = canvas.getContext('2d');
+  const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', W + 'x' + H, '-r', String(FPS), '-i', '-',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
+  let errTail = '';
+  ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
+  ff.stdin.on('error', () => {});
+  let i = 0, bi = -1, reader = null;
+  for (let f = f0; f < f1; f++) {
+    const t = f / FPS;
+    while (i < tl.scenes.length - 1 && t >= tl.scenes[i].start + tl.scenes[i].dur) i++;
+    if (i !== bi) {
+      if (reader) reader.close();
+      reader = null; bi = i;
+      const sc = tl.scenes[i], file = sc.broll && env.brolls[sc.broll];
+      if (file) {
+        // Segment commencé en cours de scène : le plan reprend au bon endroit.
+        const d = env.brollDur[sc.broll] || 0;
+        let at = (sc.broll_start || 1) + Math.max(0, t - sc.start);
+        if (d > 2) at = at % (d - 0.5);
+        reader = new Broll(file, at);
+      }
+    }
+    env.brollFrame = reader ? await reader.next() : null;
+    drawFrame(ctx, env, tl, i, t);
+    const img = ctx.getImageData(0, 0, W, H);
+    const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
+    if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
+    if ((f - f0) % 600 === 0) console.log('image ' + f + ' / ' + Math.ceil(tl.total * FPS) + ' — ' + mem());
+  }
+  if (reader) reader.close();
+  ff.stdin.end();
+  const [code] = await once(ff, 'close');
+  if (code !== 0) throw new Error('Encodage vidéo échoué : ' + errTail.slice(-300));
+}
+
+function events(tl, env) {
+  const ev = [];
+  tl.scenes.forEach((s) => {
+    if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
+    if (s.kind === 'chapter') ev.push({ name: 'rise', at: s.start - 0.4, vol: 0.3 }, { name: 'impact', at: s.start + 0.35, vol: 0.55 });
+    if (s.kind === 'point') ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.35 });
+    const T = (f) => (s.voiceAt - s.start) + s.voiceDur * f;
+    if (s.kind === 'chapter') ev.push({ name: typeDur(s.title) < 1 ? 'keys_s' : 'keys', at: s.start + 0.35, vol: 0.35 });
+    if (s.kind === 'point' && s.title) ev.push({ name: typeDur(s.title) < 1 ? 'keys_s' : 'keys', at: s.start + 0.15, vol: 0.3 });
+    const nb = (s.bullets || []).length;
+    for (let b = 0; b < nb; b++) ev.push({ name: 'pop', at: s.start + T(0) + 0.3 + s.voiceDur * 0.8 * (b / nb), vol: 0.35 });
+    if (s.visual && VISUALS[s.visual.type]) for (const [name, at] of visualSfx(s.visual.type, T)) ev.push({ name, at: s.start + at, vol: name === 'key' ? 0.35 : 0.4 });
+    if (s.shotKey && env.shots[s.shotKey]) {
+      const shot = env.shots[s.shotKey];
+      stepTimes(shot, s.shotScreen, s.dur).forEach((x, k) => {
+        if (x < 0 || !Number.isFinite(x)) return;
+        const ty = shot.stills[k].type;
+        if (ty === 'click') ev.push({ name: 'tap', at: s.start + x - 0.05, vol: 0.45 });
+        if (ty === 'key') ev.push({ name: 'key', at: s.start + x, vol: 0.4 });
+      });
+    }
+    if (s.kind === 'cta') {
+      const t0 = T(0.12), tType = 'alvecapital.fr'.length / 12, tTap = t0 + tType + 1.3;
+      ev.push({ name: 'keys', at: s.start + t0, vol: 0.4 }, { name: 'pop', at: s.start + t0 + tType + 0.3, vol: 0.4 }, { name: 'tap', at: s.start + tTap - 0.05, vol: 0.5 }, { name: 'ding', at: s.start + tTap + 0.1, vol: 0.45 });
+    }
+    if (s.kind === 'outro') ev.push({ name: 'ding', at: s.start + 0.4, vol: 0.45 });
+  });
+  return ev;
+}
+
+// Aperçu déposé sur le dépôt du studio (trop lourd pour un envoi direct).
+export async function publishPreview(file) {
+  const repo = process.env.GH_REPO, tok = process.env.GH_TOKEN;
+  if (!repo || !tok) throw new Error('Jeton du dépôt manquant');
+  const hd = { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json', 'User-Agent': 'alve-studio' };
+  const tag = 'apercu-' + Date.now();
+  const rel = await (await fetch('https://api.github.com/repos/' + repo + '/releases', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, hd), body: JSON.stringify({ tag_name: tag, name: 'Aperçu ' + tag, prerelease: true }) })).json();
+  if (!rel.upload_url) throw new Error('Dépôt de l’aperçu refusé : ' + JSON.stringify(rel).slice(0, 200));
+  const buf = readFileSync(file);
+  const r = await fetch(rel.upload_url.replace(/\{.*\}$/, '') + '?name=apercu.mp4', { method: 'POST', headers: Object.assign({ 'Content-Type': 'video/mp4', 'Content-Length': String(buf.length) }, hd), body: buf });
+  const j = await r.json().catch(() => ({}));
+  if (!j.browser_download_url) throw new Error('Envoi de l’aperçu échoué (' + r.status + ')');
+  return j.browser_download_url;
+}
+
+export async function voices(job, DIR) {
+  const files = [], durs = [];
+  for (const [i, s] of job.scenes.entries()) {
+    const f = join(DIR, 'v' + i + '.mp3');
+    await download(s.audio_url, f);
+    const d = await duration(f);
+    if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
+    files.push(f); durs.push(d);
+  }
+  console.log('Voix Henri : ' + files.length + ' scènes');
+  return { files, durs, voice: 'henri' };
+}
+
+export async function runLong(job, DIR) {
+  // 1) Les vrais écrans d'abord : une session expirée arrête tout de suite.
+  const raw = await captureScreens(job, DIR);
+  const shots = await loadShots(raw);
+  // 2) La voix.
+  const vo = await voices(job, DIR);
+  const tl = buildTimeline(job.scenes, vo.durs);
+  console.log('Vidéo longue : ' + tl.scenes.length + ' scènes, ' + tl.total.toFixed(1) + ' s');
+  tl.scenes.forEach((s, i) => {
+    if (s.screen && s.screen.path) { s.shotKey = screenKey(s.screen); s.shotScreen = s.screen; }
+    else if (s.kind === 'chapter') {
+      const nx = tl.scenes.slice(i + 1).find((x) => x.screen && x.screen.path);
+      if (nx && nx.chapter === s.chapter) { s.shotKey = screenKey(nx.screen); s.shotScreen = { path: nx.screen.path, from: nx.screen.from || 0, to: nx.screen.from || 0, static: true }; }
+    }
+  });
+  const F = await loadFonts(DIR);
   const logoUrl = job.logo_url;
   if (!(await loadImg(logoUrl))) throw new Error('Logo du site introuvable');
   const env = { shots, chapters: {}, marks: [] };
   // Plans d'illustration (bibliothèque du site) téléchargés une seule fois.
-  env.brolls = {};
+  const brolls = {}, brollDur = {};
   const urls = [...new Set(tl.scenes.map((s) => s.broll).filter(Boolean))];
   for (const [k, u] of urls.entries()) {
     const f = join(DIR, 'broll' + k + '.mp4');
-    try { await download(u, f); env.brolls[u] = f; } catch (e) { console.error('Plan d’illustration indisponible : ' + u); }
+    try { await download(u, f); brolls[u] = f; brollDur[u] = await duration(f).catch(() => 0); } catch (e) { console.error('Plan d’illustration indisponible : ' + u); }
   }
-  console.log('Plans d’illustration : ' + Object.keys(env.brolls).length + ' / ' + urls.length);
+  console.log('Plans d’illustration : ' + Object.keys(brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const longSpec = { total: tl.total, chapters: env.chapters, marks: env.marks, shots, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls: env.brolls };
-  await render(longSpec, tl, video, DIR);
+  const spec = { F, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur };
+  await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
   await mixAudio(DIR, tl, vo.files, events(tl, env), audio);
