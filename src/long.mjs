@@ -387,8 +387,8 @@ export async function buildEnv(spec, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(env.brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const spec = { total: tl.total, chapters: env.chapters, marks: env.marks, shots, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls: env.brolls };
-  await render(spec, tl, video, DIR);
+  const longSpec = { total: tl.total, chapters: env.chapters, marks: env.marks, shots, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls: env.brolls };
+  await render(longSpec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
   await mixAudio(DIR, tl, vo.files, events(tl, env), audio);
