@@ -61,7 +61,7 @@ async function main() {
   // Voix clonée si un enregistrement de référence existe ; sinon (ou en cas
   // d'échec) la voix Henri déjà préparée pour chaque scène.
   let cloned = null;
-  if (job.clone_voice_url) {
+  if (false) { // voix Henri uniquement
     try { cloned = await cloneVoices(DIR, job.clone_voice_url, job.scenes); console.log('Voix clonée prête'); }
     catch (e) { console.error('Clonage impossible, voix Henri utilisée : ' + String((e && e.message) || e).slice(-300)); }
   }
