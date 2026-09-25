@@ -182,6 +182,31 @@ function hiWords(s) {
 }
 const isHi = (s, w) => hiWords(s).has(norm(w)) || /\d/.test(w);
 const wordAt = (s, k) => s.voiceAt - s.start + s.words[k].start * s.voiceDur;
+// Instant (dans la scène) où la voix prononce `frag` (null s'il n'est pas dit).
+function sayAt(s, frag) {
+  const n = norm(frag); if (!n) return null;
+  const k = (s.words || []).findIndex((w) => norm(w.text).startsWith(n));
+  return k < 0 ? null : wordAt(s, k);
+}
+// Surligneur façon feutre : bande translucide qui se dessine de gauche à droite.
+function marker(ctx, x, y, w, h, p) {
+  if (p <= 0) return;
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgba(250,204,21,0.6)';
+  ctx.beginPath(); ctx.moveTo(x, y + h * 0.1); ctx.lineTo(x + w * p, y); ctx.lineTo(x + w * p, y + h * 0.92); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// Cercle tracé à la main autour d'un chiffre.
+function scribble(ctx, cx, cy, rx, ry, p, color) {
+  if (p <= 0) return;
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  const a0 = -2.3, a1 = a0 + Math.PI * 2.12 * p;
+  for (let a = a0, first = true; a <= a1; a += 0.04, first = false) {
+    const k = 1 + 0.035 * Math.sin(a * 3 + 1), x = cx + Math.cos(a) * rx * k, y = cy + Math.sin(a) * ry * k;
+    if (first) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.restore();
+}
 
 function textFlow(ctx, s, lt, t, o) {
   if (!s.words || !s.words.length) return;
@@ -299,6 +324,8 @@ export const LOOKS = {
       txt(ctx, r.match, -tw / 2 + 44, y, 30, env.F.sb, MUTE_D, 'left');
       txt(ctx, r.pick, -tw / 2 + 44, y + 62, 52, env.F.black, INK, 'left');
       txt(ctx, fr(r.odd), tw / 2 - 44, y + 62, 96, env.F.display, INK, 'right');
+      const mt = sayAt(s, fr(r.odd));
+      if (mt != null) { font(ctx, 96, env.F.display); const ow = ctx.measureText(fr(r.odd)).width; marker(ctx, tw / 2 - 58 - ow, y - 6, ow + 30, 82, easeOut(prog(lt, mt, 0.45))); }
       y += 140;
     });
     ctx.strokeStyle = 'rgba(11,16,32,0.18)'; ctx.lineWidth = 3; ctx.setLineDash([14, 12]);
@@ -321,6 +348,8 @@ export const LOOKS = {
     txt(ctx, 'COTE · ' + L.pick_label, 520, 360, 30, env.F.xb, MUTE_D);
     ctx.save(); ctx.translate(520, 560); ctx.scale(Math.max(0.01, a), Math.max(0.01, a));
     txt(ctx, fr(L.odd), 0, 100, 300, env.F.display, INK); ctx.restore();
+    const mo = rest ? null : sayAt(s, fr(L.odd));
+    if (mo != null) scribble(ctx, 520, 552, 300, 150, easeOut(prog(lt, mo + 0.05, 0.7)), '#F59E0B');
     const b = rest ? 1 : easeOut(prog(lt, T(s, 0.3), 0.4));
     if (b > 0) flowArrow(ctx, 830, 540, 1010, 540, b, lt, '#4F46E5');
     const gx = 1380, gy = 540, R = 220, a0 = -Math.PI / 2;
@@ -360,6 +389,7 @@ export const LOOKS = {
       const v = 1 + (c.odd - 1) * easeOut(prog(lt, at + 0.25, 0.7));
       ctx.shadowColor = rgba(acc, 0.25); ctx.shadowBlur = 30;
       txt(ctx, fr(v), 0, 165, 150, env.F.display, acc); ctx.shadowBlur = 0;
+      scribble(ctx, 0, 112, 210, 92, easeOut(prog(lt, at + 1.0, 0.6)), '#F59E0B');
       ctx.restore();
     });
     const at2 = T(s, ((L.at || [0.3, 0.65])[1]) || 0.65) + 0.6, nb = easeBack(prog(lt, at2, 0.4));
