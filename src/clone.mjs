@@ -40,30 +40,63 @@ export async function cloneModel(ref, jobs, dir) {
   }
 }
 
-// Voix off de chaque scène avec la voix clonée : on reprend celles déjà
-// prêtes, on ne fabrique ici que les manquantes.
-export async function cloneVoices(dir, refUrl, scenes) {
-  const outs = [], todo = [];
-  for (const [i, s] of scenes.entries()) {
-    const text = sayable(s), out = join(dir, 'c' + i + '.wav'), pre = join(PRE_DIR, voiceKey(text) + '.wav');
-    if (existsSync(pre)) copyFileSync(pre, out);
-    else todo.push({ text, out });
-    outs.push(out);
+// Découpe en morceaux courts (mêmes règles que clone.py) : chaque phrase est
+// fabriquée à part, sur n'importe quelle machine, puis les morceaux sont recollés.
+export function pieces(text) {
+  const out = [];
+  for (const sn of String(text).trim().split(/(?<=[.!?…])\s+/).filter((x) => x.trim())) {
+    if (sn.length <= 120) { out.push([sn, 0.3]); continue; }
+    let cur = '';
+    for (const part of sn.split(/(?<=[,:;])\s+/)) {
+      if (cur && cur.length + part.length > 110) { out.push([cur, 0.16]); cur = part; }
+      else cur = (cur + ' ' + part).trim();
+    }
+    if (cur) out.push([cur, 0.3]);
   }
-  console.log('Voix clonée : ' + (scenes.length - todo.length) + ' scènes déjà prêtes, ' + todo.length + ' à fabriquer');
-  if (todo.length) await cloneModel(await prepRef(dir, refUrl), todo, dir);
+  return out;
+}
+
+async function joinPieces(files, pauses, out) {
+  if (files.length === 1) { copyFileSync(files[0], out); return; }
+  const args = ['-y'], f = [];
+  files.forEach((p, i) => { args.push('-i', p); f.push('[' + i + ':a]' + (i < files.length - 1 ? 'apad=pad_dur=' + pauses[i] : 'anull') + '[p' + i + ']'); });
+  f.push(files.map((_, i) => '[p' + i + ']').join('') + 'concat=n=' + files.length + ':v=0:a=1[o]');
+  await run('ffmpeg', [...args, '-filter_complex', f.join(';'), '-map', '[o]', out]);
+}
+
+// Voix off de chaque scène avec la voix clonée : on reprend les morceaux déjà
+// prêts (machines « voix »), on ne fabrique ici que les manquants.
+export async function cloneVoices(dir, refUrl, scenes) {
+  const plan = [], todo = new Map();
+  for (const [i, s] of scenes.entries()) {
+    const ps = pieces(sayable(s)).map(([text, pause]) => {
+      const key = voiceKey(text), pre = join(PRE_DIR, key + '.wav'), own = join(dir, 'p' + key + '.wav');
+      const file = existsSync(pre) ? pre : own;
+      if (file === own && !todo.has(key)) todo.set(key, { text, out: own });
+      return { file, pause };
+    });
+    plan.push({ ps, out: join(dir, 'c' + i + '.wav') });
+  }
+  console.log('Voix clonée : ' + todo.size + ' morceaux à fabriquer ici');
+  if (todo.size) await cloneModel(await prepRef(dir, refUrl), [...todo.values()], dir);
+  const outs = [];
+  for (const p of plan) {
+    const ok = p.ps.filter((x) => existsSync(x.file));
+    if (ok.length === p.ps.length && ok.length) await joinPieces(ok.map((x) => x.file), ok.map((x) => x.pause), p.out);
+    outs.push(p.out);
+  }
   return outs;
 }
 
-// Répartit les scènes entre les machines : les plus longues d'abord, chacune
+// Répartit les morceaux entre les machines : les plus longs d'abord, chacun
 // vers la machine la moins chargée.
 export function shardJobs(scenes, shard, shards, outDir) {
   const uniq = new Map();
-  for (const s of scenes) { const text = sayable(s); if (text.trim()) uniq.set(voiceKey(text), text); }
+  for (const s of scenes) for (const [text] of pieces(sayable(s))) uniq.set(voiceKey(text), text);
   const load = Array(shards).fill(0), mine = [];
   for (const [key, text] of [...uniq].sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : 1))) {
     const k = load.indexOf(Math.min(...load));
-    load[k] += text.length;
+    load[k] += text.length + 40;
     if (k === shard) mine.push({ text, out: join(outDir, key + '.wav') });
   }
   return mine;
