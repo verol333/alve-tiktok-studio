@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync, copyFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, existsSync, copyFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { download } from './api.mjs';
@@ -20,7 +20,7 @@ export async function prepRef(dir, refUrl) {
   mkdirSync(dir, { recursive: true });
   const raw = join(dir, 'ref_raw'), ref = join(dir, 'ref.wav');
   await download(refUrl, raw);
-  await run('ffmpeg', ['-y', '-i', raw, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB,highpass=f=70,loudnorm=I=-18:TP=-2', '-t', '20', '-ac', '1', '-ar', '24000', ref]);
+  await run('ffmpeg', ['-y', '-i', raw, '-af', 'silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_duration=0.4:stop_threshold=-45dB:stop_silence=0.15,afftdn=nf=-25,highpass=f=70,loudnorm=I=-18:TP=-2', '-t', '20', '-ac', '1', '-ar', '24000', ref]);
   return ref;
 }
 
@@ -29,6 +29,15 @@ export async function cloneModel(ref, jobs, dir) {
   const list = join(dir, 'clone-' + Date.now() + '.json');
   writeFileSync(list, JSON.stringify(jobs));
   await run('python', ['src/clone.py', ref, list]);
+  // Nettoyage : souffle retiré, sifflantes adoucies, débit un peu plus posé,
+  // longs blancs raccourcis — chaque mot reste bien audible.
+  for (const j of jobs) {
+    if (!existsSync(j.out)) continue;
+    const raw = j.out.replace(/\.wav$/, '.raw.wav');
+    renameSync(j.out, raw);
+    await run('ffmpeg', ['-y', '-i', raw, '-af', 'afftdn=nf=-28,deesser=i=0.35,atempo=0.96,silenceremove=stop_periods=-1:stop_duration=0.7:stop_threshold=-48dB:stop_silence=0.35', j.out])
+      .catch(() => copyFileSync(raw, j.out));
+  }
 }
 
 // Voix off de chaque scène avec la voix clonée : on reprend celles déjà
