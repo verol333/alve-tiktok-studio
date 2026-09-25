@@ -16,10 +16,10 @@ import { buildTimeline } from './timeline.mjs';
 import { makeSfx, mixAudio, libraryMusic } from './audio.mjs';
 import { cloneVoices } from './clone.mjs';
 import { captureScreens, screenKey } from './capture.mjs';
-import { loadShots, screenState, drawPhone, stepTimes } from './phone.mjs';
+import { loadShots, screenState, drawPhone, stepTimes, PH } from './phone.mjs';
 import { Broll } from './broll.mjs';
 import { VISUALS, visualSfx } from './visuals.mjs';
-import { LOOKS, lookSfx, lookImages, finishFx } from './cine.mjs';
+import { LOOKS, lookSfx, lookImages, finishFx, setStage } from './cine.mjs';
 import { Clip } from './clip.mjs';
 import { drawWalkPhone, CW, CH } from './walkPhone.mjs';
 import { alignScenes } from './align.mjs';
@@ -30,13 +30,16 @@ const P = { a: '#33D98E', b: '#818CF8', d1: '#0A0F1E', d2: '#1C2336', ink: '#E7E
 const ACCENTS = ['#33D98E', '#818CF8', '#F3C969', '#22D3EE', '#FB923C', '#F472B6'];
 const accentOf = (s) => ACCENTS[(s.chapter || 0) % ACCENTS.length];
 const COL = { x: 120, w: 1060, cx: 650 };
+// Taille réelle de l'image : 1920x1080, ou 1080x1920 pour le Reel Facebook vertical.
+let SW = W, SH = H, VERT = false;
 
 function background(ctx, env, s, t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  const W = SW, H = SH;
   ctx.fillStyle = P.d1; ctx.fillRect(0, 0, W, H);
   if (env.brollFrame) {
     // Plan d'illustration en fond (lent zoom), assombri pour garder le texte lisible.
-    const z = 1.04 + 0.06 * prog(t - s.start, 0, s.dur), w = W * z, h = H * z;
+    const bf = env.brollFrame, z = 1.04 + 0.06 * prog(t - s.start, 0, s.dur), kf = Math.max(W / bf.width, H / bf.height) * z, w = bf.width * kf, h = bf.height * kf;
     ctx.drawImage(env.brollFrame, (W - w) / 2, (H - h) / 2, w, h);
     const g = ctx.createLinearGradient(0, 0, W, 0);
     const side = s.kind === 'chapter' || s.kind === 'point';
@@ -341,7 +344,116 @@ function phone(ctx, env, tl, i, t) {
   drawPhone(ctx, layers, vis, t, accentOf(s));
 }
 
+// ── Reel Facebook vertical (1080x1920) : même habillage cinéma que la vidéo longue ──
+// Le décor couvre tout l'écran, le contenu de chaque look est posé au centre à
+// l'échelle qui lui convient, le téléphone filmé est agrandi, sous-titres et
+// bandeau sont refaits pour le vertical.
+const KV = { kinetic: 0.84, ticket: 1, scoreboard: 0.84, prob: 0.72, odds: 0.72, split: 0.7, bigstat: 0.72, books: 1, mail: 0.68, login: 0.66 };
+const stageV = (ctx, k, cy) => ctx.setTransform(k, 0, 0, k, SW / 2 - (W / 2) * k, cy - (H / 2) * k);
+
+function groupsV(s) {
+  if (s._gv) return s._gv;
+  const out = []; let cur = null;
+  s.words.forEach((w, k) => {
+    const stop = cur && /[.!?…:,]$/.test(s.words[k - 1].text);
+    if (!cur || stop || k - cur.from >= 5 || cur.len + w.text.length > 26) { cur = { from: k, to: k, len: w.text.length }; out.push(cur); }
+    else { cur.to = k; cur.len += w.text.length + 1; }
+  });
+  return (s._gv = out);
+}
+
+function drawSubsV(ctx, env, s, t, y) {
+  if (!s.words || !s.words.length) return;
+  const p = (t - s.voiceAt) / s.voiceDur;
+  if (p < 0 || p > 1.03) return;
+  let cur = s.words.findIndex((w) => p < w.end);
+  if (cur < 0) cur = s.words.length - 1;
+  const g = groupsV(s).find((x) => cur >= x.from && cur <= x.to);
+  if (!g) return;
+  const words = s.words.slice(g.from, g.to + 1).map((w) => w.text);
+  let size = 58, sp, ws, total;
+  for (;;) {
+    font(ctx, size, env.F.xb); sp = ctx.measureText(' ').width; ws = words.map((w) => ctx.measureText(w).width);
+    total = ws.reduce((a, b) => a + b, 0) + sp * (words.length - 1);
+    if (total <= 940 || size <= 34) break;
+    size -= 2;
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  const bh = size * 1.6;
+  ctx.fillStyle = 'rgba(5,8,18,0.8)'; rr(ctx, SW / 2 - total / 2 - 36, y - bh / 2, total + 72, bh, bh / 2); ctx.fill();
+  let x = SW / 2 - total / 2;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  const acc = accentOf(s);
+  words.forEach((w, i) => {
+    const k = g.from + i;
+    ctx.fillStyle = k === cur ? acc : k < cur ? P.ink : rgba(P.ink, 0.55);
+    ctx.fillText(w, x, y + size * 0.36);
+    x += ws[i] + sp;
+  });
+}
+
+function drawHudV(ctx, env, s, t, light) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  if (s.kind !== 'intro' && s.kind !== 'outro' && !(s.look && s.look.nohud)) {
+    font(ctx, 34, env.F.display);
+    const w = ctx.measureText('AL VE CAPITAL').width, x0 = SW / 2 - (w + 64) / 2;
+    logo(ctx, env, x0 + 24, 118, 52, 0);
+    font(ctx, 34, env.F.display); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = light ? '#0B1020' : rgba(P.ink, 0.92); ctx.fillText('AL VE CAPITAL', x0 + 64, 130);
+  }
+  const y = SH - 10;
+  ctx.fillStyle = rgba(P.ink, 0.1); ctx.fillRect(0, y, SW, 10);
+  ctx.fillStyle = accentOf(s); ctx.fillRect(0, y, SW * (t / env.total), 10);
+}
+
+function drawFrameV(ctx, env, tl, i, t) {
+  const s = tl.scenes[i], lt = t - s.start;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  const look = s.look && LOOKS[s.look.type];
+  if (look) {
+    stageV(ctx, KV[s.look.type] || 0.72, s.look.type === 'kinetic' ? 960 : 900);
+    const r = look(ctx, env, s, lt, t) || {};
+    if (r.phone) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(SW / 2, 1200); ctx.scale(1.38, 1.38); ctx.translate(-PH.cx, -PH.cy);
+      if (s.seg) drawWalkPhone(ctx, env, s, lt, t, accentOf(s)); else phone(ctx, env, tl, i, t);
+      ctx.restore();
+    }
+    if (r.subs) drawSubsV(ctx, env, s, t, 1560);
+    drawHudV(ctx, env, s, t, r.light);
+    finishFx(ctx, s, lt);
+    return;
+  }
+  background(ctx, env, s, t);
+  const inn = easeOut(prog(lt, 0, 0.5)), out = prog(lt, s.dur - 0.3, 0.3), a = clamp(inn * (1 - out), 0, 1);
+  const vz = s.visual && VISUALS[s.visual.type];
+  if (vz) {
+    ctx.save(); ctx.globalAlpha = a;
+    if (s.title) {
+      const fit = fitLines(ctx, s.title, env.F.black, 76, 50, 940, 2);
+      font(ctx, fit.size, env.F.black); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = P.ink;
+      fit.lines.forEach((ln, k) => ctx.fillText(ln.join(' '), SW / 2, 330 + k * fit.size * 1.12));
+    }
+    const T = (f) => (s.voiceAt - s.start) + s.voiceDur * f;
+    ctx.translate(SW / 2 + (1 - inn) * 120, 960); ctx.scale(1.42, 1.42); ctx.translate(-1450, -555);
+    vz(ctx, env.F, lt, T, s.visual);
+    ctx.restore();
+    drawSubsV(ctx, env, s, t, 1620);
+  } else {
+    stageV(ctx, 0.9, 900);
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - inn) * 40);
+    if (s.kind === 'intro') drawIntro(ctx, env, s, lt);
+    else if (s.kind === 'outro') drawOutro(ctx, env, s, lt);
+    else drawCta(ctx, env, s, lt);
+    ctx.restore();
+    if (s.kind === 'cta') drawSubsV(ctx, env, s, t, 1560);
+  }
+  drawHudV(ctx, env, s, t, false);
+  finishFx(ctx, s, lt);
+}
+
 function drawFrame(ctx, env, tl, i, t) {
+  if (VERT) return drawFrameV(ctx, env, tl, i, t);
   const s = tl.scenes[i];
   const look = s.look && LOOKS[s.look.type];
   if (look) {
@@ -416,11 +528,12 @@ async function segment(specFile, [f0, f1, out], k) {
 // téléchargées, écrans filmés relus depuis le disque).
 export async function buildEnv(spec, DIR) {
   for (const name of Object.values(spec.F)) GlobalFonts.registerFromPath(join(DIR, name + '.ttf'), name);
+  if (spec.vertical) { SW = 1080; SH = 1920; VERT = true; setStage(SW, SH); }
   const r = seeded(7);
   const env = {
     F: spec.F, total: spec.total, chapters: spec.chapters, marks: spec.marks, brolls: spec.brolls, brollDur: spec.brollDur || {},
     shots: await loadShots(spec.raw),
-    particles: Array.from({ length: 50 }, () => ({ x: r() * W, y: r() * H, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
+    particles: Array.from({ length: 50 }, () => ({ x: r() * SW, y: r() * SH, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
     bg: await loadImg(spec.bg), logo: await loadImg(spec.logo), imgs: {}, walk: spec.walk || null,
   };
   for (const u of spec.imgs || []) env.imgs[u] = await loadImg(u);
@@ -430,8 +543,8 @@ export async function buildEnv(spec, DIR) {
 
 // Images f0 à f1 (exclue) de la vidéo, encodées dans le fichier out.
 export async function renderSegment(env, tl, f0, f1, out) {
-  const canvas = createCanvas(W, H), ctx = canvas.getContext('2d');
-  const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', W + 'x' + H, '-r', String(FPS), '-i', '-',
+  const canvas = createCanvas(SW, SH), ctx = canvas.getContext('2d');
+  const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', SW + 'x' + SH, '-r', String(FPS), '-i', '-',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
   let errTail = '';
   ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
@@ -461,7 +574,7 @@ export async function renderSegment(env, tl, f0, f1, out) {
     env.brollFrame = reader ? await reader.next() : null;
     env.clipFrame = clip ? ((await clip.next()) || null) : null;
     drawFrame(ctx, env, tl, i, t);
-    const img = ctx.getImageData(0, 0, W, H);
+    const img = ctx.getImageData(0, 0, SW, SH);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
     if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
     if ((f - f0) % 600 === 0) console.log('image ' + f + ' / ' + Math.ceil(tl.total * FPS) + ' — ' + mem());
@@ -596,7 +709,7 @@ export async function runLong(job, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const spec = { F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes) };
+  const spec = { vertical: (job.style || {}).format === 'vertical', F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes) };
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
@@ -605,10 +718,10 @@ export async function runLong(job, DIR) {
   const { out } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', final]);
   const info = JSON.parse(out);
   const v = info.streams.find((x) => x.codec_type === 'video'), a = info.streams.find((x) => x.codec_type === 'audio');
-  if (!v || v.width !== W || v.height !== H || !a) throw new Error('Contrôle technique : format ou son incorrect');
+  if (!v || v.width !== (spec.vertical ? 1080 : W) || v.height !== (spec.vertical ? 1920 : H) || !a) throw new Error('Contrôle technique : format ou son incorrect');
   console.log('Contrôle technique OK : ' + parseFloat(info.format.duration).toFixed(1) + ' s');
   const prev = join(DIR, 'preview.mp4');
-  await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=1280:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', prev]);
+  await run('ffmpeg', ['-y', '-i', final, '-vf', spec.vertical ? 'scale=720:-2' : 'scale=1280:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', prev]);
   const url = await publishPreview(prev);
   console.log('Aperçu : ' + url);
   const full = await publishPreview(final);
