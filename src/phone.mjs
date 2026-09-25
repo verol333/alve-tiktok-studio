@@ -30,16 +30,18 @@ const skipOf = (shot, screen) => {
 // Instant (dans la scène) où chaque geste filmé apparaît ; -1 = déjà fait.
 export function stepTimes(shot, screen, dur) {
   if (!acts(shot, screen)) return [];
-  const st = shot.stills, skip = skipOf(shot, screen);
+  const st = shot.stills, skip = skipOf(shot, screen), pace = screen.pace || 1;
+  const upto = screen.upto != null ? screen.upto : Infinity;
   const t0 = skip ? 0.5 : clamp(dur * 0.3, 1.8, 4.5);
   let t = t0; const times = [];
   st.forEach((x, k) => {
     if (k < skip) { times.push(-1); return; }
-    if (k > skip) t += x.type === 'click' ? 1.4 : x.type === 'key' ? 0.18 : 0.45;
+    if (x.step >= upto) { times.push(Infinity); return; }
+    if (k > skip) t += (x.type === 'click' ? 1.4 : x.type === 'key' ? 0.18 : 0.45) * (x.type === 'key' ? 1 : pace);
     times.push(t);
   });
   const last = t, lim = dur - 1.2;
-  if (last > lim && last > t0) { const f = Math.max(0.3, (lim - t0) / (last - t0)); return times.map((x) => (x < 0 ? x : t0 + (x - t0) * f)); }
+  if (last > lim && last > t0) { const f = Math.max(0.3, (lim - t0) / (last - t0)); return times.map((x) => (x < 0 || !Number.isFinite(x) ? x : t0 + (x - t0) * f)); }
   return times;
 }
 
@@ -48,7 +50,7 @@ export function screenState(shot, screen, lt, dur) {
   const from = clamp(screen.from || 0, 0, maxScroll);
   const act = acts(shot, screen);
   const times = stepTimes(shot, screen, dur);
-  const first = act ? (times.find((x) => x >= 0) ?? dur) : dur * 0.9;
+  const first = act ? (times.find((x) => x >= 0 && Number.isFinite(x)) ?? dur * 0.75) : dur * 0.9;
   const to = act ? clamp(shot.scroll_at_tap || 0, 0, maxScroll) : clamp(screen.to != null ? screen.to : Math.min(maxScroll, 1100), 0, maxScroll);
   const already = act && times[0] === -1;
   const p = already ? 1 : inOut(prog(lt, 0.5, Math.max(0.4, first - 1.0)));
@@ -59,7 +61,7 @@ export function screenState(shot, screen, lt, dur) {
   let tap = null;
   times.forEach((x, k) => {
     const s = shot.stills[k];
-    if (x >= 0 && s.type === 'click' && s.tap && lt > x - 0.45 && lt < x + 0.35) tap = { x: s.tap.x, y: s.tap.y, k: prog(lt, x - 0.45, 0.8) };
+    if (x >= 0 && Number.isFinite(x) && s.type === 'click' && s.tap && lt > x - 0.45 && lt < x + 0.35) tap = { x: s.tap.x, y: s.tap.y, k: prog(lt, x - 0.45, 0.8) };
   });
   return { scroll: from + (to - from) * p, cur, fade, tap, zoom: 1 + 0.02 * prog(lt, 0, dur) };
 }
