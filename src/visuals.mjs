@@ -349,7 +349,118 @@ function otp(ctx, F, lt, T, v) {
   if (pd > 0) { ctx.save(); enter(ctx, pd); mark(ctx, CXP - 190, 862, 24, G, pd, true); tx(ctx, 'Accès à tout le site', CXP - 150, 874, 32, F.xb, INK); ctx.restore(); }
 }
 
-export const VISUALS = { odds, discret, outcomes, speed, leverage, shield, coupon, books, otp };
+
+function fitTx(ctx, s, x, y, size, min, maxW, fam, color, align) {
+  let z = size; font(ctx, z, fam);
+  while (z > min && ctx.measureText(String(s)).width > maxW) { z -= 2; font(ctx, z, fam); }
+  ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(String(s), x, y);
+}
+function logoAt(ctx, img, cx, cy, size) {
+  if (!img || !img.width) { ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.arc(cx, cy, size / 2, 0, Math.PI * 2); ctx.fill(); return; }
+  const k = Math.min(size / img.width, size / img.height), w = img.width * k, h = img.height * k;
+  ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+}
+const scoreTxt = (s) => String(s || '').replace(/\s*[-:]\s*/, ' - ');
+const proofAt = (T, i, n) => ({ at: T(0.08 + i * (0.8 / n)), ok: T(0.08 + (i + 1) * (0.8 / n)) - 0.35 });
+
+// ── Nos prédictions d'hier, validées ──
+function proof(ctx, F, lt, T, v) {
+  const rows = (v.rows || []).slice(0, 3), n = rows.length || 1, hgt = 150, gap = 22, y0 = 200 + (3 - n) * 40;
+  rows.forEach((r, i) => {
+    const y = y0 + i * (hgt + gap), tm = proofAt(T, i, n), p = ap(lt, tm.at, 0.5);
+    if (p <= 0) return;
+    const ok = lt > tm.ok;
+    ctx.save(); enter(ctx, p, 80, 0);
+    card(ctx, X0, y, PW, hgt, ok ? G : null);
+    logoAt(ctx, v._imgs && v._imgs[i * 2], X0 + 58, y + 52, 58);
+    logoAt(ctx, v._imgs && v._imgs[i * 2 + 1], X0 + 128, y + 52, 58);
+    fitTx(ctx, r.home + '  ' + scoreTxt(r.score) + '  ' + r.away, X0 + 176, y + 66, 32, 18, PW - 270, F.xb, INK);
+    fitTx(ctx, r.label, X0 + 36, y + 122, 28, 18, PW - 140, F.sb, MUTE);
+    ctx.restore();
+    mark(ctx, X0 + PW - 56, y + hgt / 2, 34, G, prog(lt, tm.ok, 0.4), true);
+  });
+  const pb = ap(lt, T(0.9), 0.5);
+  if (pb > 0 && v.badge) {
+    ctx.save(); enter(ctx, pb);
+    ctx.fillStyle = rgba(G, 0.16); rr(ctx, X0 + 40, 790, PW - 80, 90, 45); ctx.fill();
+    ctx.strokeStyle = rgba(G, 0.6); ctx.lineWidth = 2; ctx.stroke();
+    fitTx(ctx, v.badge, CXP, 848, 38, 22, PW - 120, F.xb, G, 'center');
+    ctx.restore();
+  }
+}
+
+// ── Un match du jour et notre prédiction la plus fiable ──
+function pick(ctx, F, lt, T, v) {
+  tx(ctx, "AUJOURD'HUI" + (v.time ? ' · ' + v.time : ''), CXP, 205, 26, F.xb, MUTE, 'center');
+  const p1 = ap(lt, T(0.02), 0.6);
+  if (p1 > 0) {
+    ctx.save(); enter(ctx, p1);
+    card(ctx, X0, 235, PW, 230, null);
+    const z = Math.max(0.01, 0.85 + 0.15 * easeBack(prog(lt, T(0.02), 0.6)));
+    [[0, X0 + 150, v.home], [1, X0 + PW - 150, v.away]].forEach(([k, cx, name]) => {
+      ctx.save(); ctx.translate(cx, 320); ctx.scale(z, z); logoAt(ctx, v._imgs && v._imgs[k], 0, 0, 104); ctx.restore();
+      fitTx(ctx, name, cx, 430, 30, 18, 250, F.xb, INK, 'center');
+    });
+    tx(ctx, 'VS', CXP, 336, 44, F.display, rgba(INK, 0.5), 'center');
+    ctx.restore();
+  }
+  if (v.score) {
+    const ps = ap(lt, T(0.3), 0.5);
+    if (ps > 0) { ctx.save(); enter(ctx, ps); ctx.fillStyle = rgba(B, 0.16); rr(ctx, X0 + 80, 490, PW - 160, 64, 32); ctx.fill(); fitTx(ctx, 'Score à fort potentiel : ' + scoreTxt(v.score), CXP, 533, 28, 18, PW - 200, F.sb, INK, 'center'); ctx.restore(); }
+  }
+  const pp = ap(lt, T(0.48), 0.5);
+  if (pp > 0) {
+    ctx.save(); enter(ctx, pp, 0, 40);
+    card(ctx, X0, 580, PW, 240, G);
+    ctx.fillStyle = G; rr(ctx, X0, 580, 10, 240, 5); ctx.fill();
+    tx(ctx, 'NOTRE PRÉDICTION LA PLUS FIABLE', X0 + 40, 626, 22, F.xb, G);
+    fitTx(ctx, v.label, X0 + 40, 684, 38, 20, PW - 80, F.xb, INK);
+    const pc = ap(lt, T(0.72), 0.5);
+    if (pc > 0) {
+      tx(ctx, 'COTE', X0 + 40, 740, 22, F.sb, MUTE);
+      ctx.save(); const k = Math.max(0.01, easeBack(pc)); ctx.translate(X0 + 40, 800); ctx.scale(k, k); tx(ctx, dec(v.cote), 0, 0, 64, F.display, G); ctx.restore();
+    }
+    const pf = prog(lt, T(0.86), 0.9);
+    if (pf > 0) {
+      tx(ctx, 'FIABILITÉ', X0 + PW - 40, 740, 22, F.sb, MUTE, 'right');
+      tx(ctx, Math.round(v.conf * easeOut(pf)) + ' %', X0 + PW - 40, 798, 52, F.display, INK, 'right');
+    }
+    ctx.restore();
+  }
+  const pf = prog(lt, T(0.86), 0.9);
+  if (pf > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'; rr(ctx, X0 + 40, 852, PW - 80, 22, 11); ctx.fill();
+    ctx.fillStyle = G; rr(ctx, X0 + 40, 852, Math.max(22, (PW - 80) * (v.conf / 100) * easeOut(pf)), 22, 11); ctx.fill();
+  }
+}
+
+// ── Le combiné du jour ──
+function combo(ctx, F, lt, T, v) {
+  const rows = v.rows || [], p0 = ap(lt, T(0.02), 0.5);
+  if (p0 <= 0) return;
+  ctx.save(); enter(ctx, p0);
+  card(ctx, X0, 200, PW, 350 + rows.length * 110, GOLD);
+  tx(ctx, 'COMBINÉ DU JOUR', X0 + 40, 252, 24, F.xb, GOLD);
+  tx(ctx, rows.length + ' sélections', X0 + PW - 40, 252, 24, F.sb, MUTE, 'right');
+  rows.forEach((r, i) => {
+    const y = 285 + i * 110, p = ap(lt, T(0.05 + i * 0.12), 0.4); if (p <= 0) return;
+    ctx.save(); enter(ctx, p, 60, 0);
+    fitTx(ctx, r.match, X0 + 40, y + 34, 26, 16, PW - 200, F.sb, MUTE);
+    fitTx(ctx, r.label, X0 + 40, y + 78, 32, 18, PW - 200, F.xb, INK);
+    tx(ctx, dec(r.cote), X0 + PW - 40, y + 72, 44, F.display, G, 'right');
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(X0 + 40, y + 102, PW - 80, 2);
+  });
+  const yT = 285 + rows.length * 110 + 40, pt = prog(lt, T(0.5), 1.1);
+  if (pt > 0) {
+    tx(ctx, 'COTE TOTALE', CXP, yT + 30, 26, F.xb, MUTE, 'center');
+    tx(ctx, dec(1 + (v.total - 1) * easeOut(pt)), CXP, yT + 140, 110, F.display, GOLD, 'center');
+  }
+  ctx.restore();
+}
+
+export const VISUALS = { odds, discret, outcomes, speed, leverage, shield, coupon, books, otp, proof, pick, combo };
 
 // Bruitages propres à chaque schéma (instants relatifs au début de la scène).
 export function visualSfx(type, T) {
@@ -367,6 +478,9 @@ export function visualSfx(type, T) {
     for (let i = 0; i < CP.code.length; i++) ev.push(['key', c.code + i * 0.09]);
     ev.push(['ding', c.copied]);
   }
+  if (type === 'proof') for (let i = 0; i < 3; i++) { const tm = proofAt(T, i, 3); ev.push(['pop', tm.at], ['ding', tm.ok]); }
+  if (type === 'pick') ev.push(['pop', T(0.02)], ['pop', T(0.3)], ['pop', T(0.48)], ['impact', T(0.72)], ['rise', T(0.86)]);
+  if (type === 'combo') ev.push(['pop', T(0.05)], ['pop', T(0.17)], ['rise', T(0.5)], ['ding', T(0.5) + 1.1]);
   if (type === 'books') ev.push(['pop', T(0.02)], ['rise', T(0.25)], ['ding', T(0.62)]);
   if (type === 'otp') { ev.push(['pop', T(0.02)]); for (let i = 0; i < 6; i++) ev.push(['key', T(0.36) + i * 0.22]); ev.push(['tap', otpPress(T) - 0.05], ['ding', otpPress(T) + 0.15]); }
   return ev;
