@@ -460,7 +460,34 @@ function combo(ctx, F, lt, T, v) {
   ctx.restore();
 }
 
-export const VISUALS = { odds, discret, outcomes, speed, leverage, shield, coupon, books, otp, proof, pick, combo };
+
+// ── Intérêts composés : le capital grossit petit à petit ──
+function compound(ctx, F, lt, T, v) {
+  const start = v.start || 1000, rate = v.rate || 0.02, days = v.days || [7, 30, 60, 90];
+  tx(ctx, 'EXEMPLE · ' + String(Math.round(rate * 1000) / 10).replace('.', ',') + ' % PAR JOUR RÉINVESTIS', CXP, 190, 26, F.xb, MUTE, 'center');
+  const vals = days.map((d) => start * Math.pow(1 + rate, d)), max = vals[vals.length - 1];
+  const base = 760, top = 300, bw = 104, gap = (PW - bw * (days.length + 1)) / days.length;
+  const cols = [{ label: 'Jour 1', val: start, at: T(0.04) }].concat(days.map((d, i) => ({ label: 'Jour ' + d, val: vals[i], at: T(0.18 + i * 0.17) })));
+  ctx.save();
+  card(ctx, X0, 220, PW, 640, G);
+  ctx.restore();
+  cols.forEach((c, i) => {
+    const p = ap(lt, c.at, 0.9); if (p <= 0) return;
+    const x = X0 + gap / 2 + i * (bw + gap) + 10, hh = Math.max(14, (base - top) * (c.val / max) * p);
+    const gr = ctx.createLinearGradient(0, base - hh, 0, base);
+    gr.addColorStop(0, i === cols.length - 1 ? GOLD : G); gr.addColorStop(1, rgba(G, 0.25));
+    ctx.save(); ctx.shadowColor = rgba(i === cols.length - 1 ? GOLD : G, 0.5); ctx.shadowBlur = 24 * p;
+    ctx.fillStyle = gr; rr(ctx, x, base - hh, bw, hh, 14); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.globalAlpha *= p;
+    tx(ctx, fr(c.val * p) + ' F', x + bw / 2, base - hh - 18, 26, F.xb, i === cols.length - 1 ? GOLD : INK, 'center');
+    tx(ctx, c.label, x + bw / 2, base + 44, 22, F.sb, MUTE, 'center');
+    ctx.restore();
+  });
+  const pe = ap(lt, T(0.86), 0.6);
+  if (pe > 0) { ctx.save(); enter(ctx, pe); tx(ctx, 'Illustration — pas une promesse de gain', CXP, 910, 24, F.sb, MUTE, 'center'); ctx.restore(); }
+}
+
+export const VISUALS = { compound, odds, discret, outcomes, speed, leverage, shield, coupon, books, otp, proof, pick, combo };
 
 // Bruitages propres à chaque schéma (instants relatifs au début de la scène).
 export function visualSfx(type, T) {
@@ -481,6 +508,7 @@ export function visualSfx(type, T) {
   if (type === 'proof') for (let i = 0; i < 3; i++) { const tm = proofAt(T, i, 3); ev.push(['pop', tm.at], ['ding', tm.ok]); }
   if (type === 'pick') ev.push(['pop', T(0.02)], ['pop', T(0.3)], ['pop', T(0.48)], ['impact', T(0.72)], ['rise', T(0.86)]);
   if (type === 'combo') ev.push(['pop', T(0.05)], ['pop', T(0.17)], ['rise', T(0.5)], ['ding', T(0.5) + 1.1]);
+  if (type === 'compound') { ev.push(['pop', T(0.04)]); for (let i = 0; i < 4; i++) ev.push(['pop', T(0.18 + i * 0.17)]); ev.push(['rise', T(0.6)], ['ding', T(0.72)]); }
   if (type === 'books') ev.push(['pop', T(0.02)], ['rise', T(0.25)], ['ding', T(0.62)]);
   if (type === 'otp') { ev.push(['pop', T(0.02)]); for (let i = 0; i < 6; i++) ev.push(['key', T(0.36) + i * 0.22]); ev.push(['tap', otpPress(T) - 0.05], ['ding', otpPress(T) + 0.15]); }
   return ev;
