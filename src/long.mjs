@@ -415,7 +415,7 @@ export async function publishPreview(file) {
 
 export async function voices(job, DIR) {
   let cloned = null;
-  if (job.clone_voice_url) {
+  if (false) { // voix Henri uniquement
     try { cloned = await cloneVoices(DIR, job.clone_voice_url, job.scenes); console.log('Voix clonée prête'); }
     catch (e) { console.error('Clonage impossible, voix Henri utilisée : ' + String((e && e.message) || e).slice(-300)); }
   }
@@ -477,6 +477,8 @@ export async function runLong(job, DIR) {
   await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=1280:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', prev]);
   const url = await publishPreview(prev);
   console.log('Aperçu : ' + url);
-  await api('preview', { video_url: url, voice: vo.voice });
+  const full = await publishPreview(final);
+  console.log('Version pleine qualité : ' + full);
+  await api('preview', { video_url: url, final_url: full, voice: vo.voice });
   await api('done');
 }
