@@ -2,7 +2,9 @@
 // À gauche : chapitre, titre, points clés. À droite : un téléphone qui affiche
 // les écrans réels du site, filmés juste avant le montage (défilement, appuis).
 // Voix : voix clonée de l'administrateur (voix Henri en secours).
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { freemem } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -337,122 +339,44 @@ function drawFrame(ctx, env, tl, i, t) {
   drawHud(ctx, env, s, t);
 }
 
-async function render(env, tl, out) {
-  const canvas = createCanvas(W, H), ctx = canvas.getContext('2d');
-  const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', W + 'x' + H, '-r', String(FPS), '-i', '-',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
-  let errTail = '';
-  ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
-  ff.stdin.on('error', () => {});
-  const frames = Math.ceil(tl.total * FPS);
-  let i = 0, bi = -1, reader = null;
-  for (let f = 0; f < frames; f++) {
-    const t = f / FPS;
-    while (i < tl.scenes.length - 1 && t >= tl.scenes[i].start + tl.scenes[i].dur) i++;
-    if (i !== bi) {
-      if (reader) reader.close();
-      reader = null; bi = i;
-      const sc = tl.scenes[i];
-      if (sc.broll && env.brolls[sc.broll]) reader = new Broll(env.brolls[sc.broll], sc.broll_start || 1);
-    }
-    env.brollFrame = reader ? await reader.next() : null;
-    drawFrame(ctx, env, tl, i, t);
-    const img = ctx.getImageData(0, 0, W, H);
-    const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
-    if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
-    if (f % 600 === 0) console.log('image ' + f + ' / ' + frames);
+// Montage découpé en segments d'une minute, chacun dans un processus séparé :
+// la mémoire est entièrement libérée entre deux segments (une vidéo de 7 min
+// d'un seul bloc saturait la machine vers la 6e minute de montage), un segment
+// interrompu est refait seul, et deux segments se montent en même temps.
+const SEG = 1800, PAR = 2;
+const mem = () => 'mémoire ' + Math.round(process.memoryUsage().rss / 1e6) + ' Mo, libre ' + Math.round(freemem() / 1e6) + ' Mo';
+
+async function render(spec, tl, out, DIR) {
+  const frames = Math.ceil(tl.total * FPS), segs = [];
+  for (let f = 0; f < frames; f += SEG) segs.push([f, Math.min(frames, f + SEG), join(DIR, 'seg' + segs.length + '.mp4')]);
+  const specFile = join(DIR, 'long-spec.json');
+  writeFileSync(specFile, JSON.stringify({ spec, tl }));
+  console.log('Montage en ' + segs.length + ' segments (' + PAR + ' en parallèle) — ' + mem());
+  let next = 0;
+  const worker = async () => { while (next < segs.length) { const k = next++; await segment(specFile, segs[k], k); } };
+  await Promise.all(Array.from({ length: Math.min(PAR, segs.length) }, worker));
+  const list = join(DIR, 'segs.txt');
+  writeFileSync(list, segs.map((s) => "file '" + s[2] + "'").join('\n'));
+  await run('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', out]);
+}
+
+async function segment(specFile, [f0, f1, out], k) {
+  const script = fileURLToPath(new URL('./longSegment.mjs', import.meta.url));
+  for (let a = 1; a <= 2; a++) {
+    const p = spawn(process.execPath, [script, specFile, String(f0), String(f1), out], { stdio: ['ignore', 'inherit', 'inherit'] });
+    const [code, sig] = await once(p, 'close');
+    if (code === 0) { console.log('Segment ' + (k + 1) + ' terminé — ' + mem()); return; }
+    console.error('Segment ' + (k + 1) + ' interrompu (code ' + code + (sig ? ', ' + sig : '') + ')' + (a < 2 ? ' : nouvel essai' : ''));
   }
-  if (reader) reader.close();
-  ff.stdin.end();
-  const [code] = await once(ff, 'close');
-  if (code !== 0) throw new Error('Encodage vidéo échoué : ' + errTail.slice(-300));
+  throw new Error('Segment ' + (k + 1) + ' impossible à monter');
 }
 
-function events(tl, env) {
-  const ev = [];
-  tl.scenes.forEach((s) => {
-    if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
-    if (s.kind === 'chapter') ev.push({ name: 'rise', at: s.start - 0.4, vol: 0.3 }, { name: 'impact', at: s.start + 0.35, vol: 0.55 });
-    if (s.kind === 'point') ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.35 });
-    const T = (f) => (s.voiceAt - s.start) + s.voiceDur * f;
-    if (s.kind === 'chapter') ev.push({ name: typeDur(s.title) < 1 ? 'keys_s' : 'keys', at: s.start + 0.35, vol: 0.35 });
-    if (s.kind === 'point' && s.title) ev.push({ name: typeDur(s.title) < 1 ? 'keys_s' : 'keys', at: s.start + 0.15, vol: 0.3 });
-    const nb = (s.bullets || []).length;
-    for (let b = 0; b < nb; b++) ev.push({ name: 'pop', at: s.start + T(0) + 0.3 + s.voiceDur * 0.8 * (b / nb), vol: 0.35 });
-    if (s.visual && VISUALS[s.visual.type]) for (const [name, at] of visualSfx(s.visual.type, T)) ev.push({ name, at: s.start + at, vol: name === 'key' ? 0.35 : 0.4 });
-    if (s.shotKey && env.shots[s.shotKey]) {
-      const shot = env.shots[s.shotKey];
-      stepTimes(shot, s.shotScreen, s.dur).forEach((x, k) => {
-        if (x < 0 || !Number.isFinite(x)) return;
-        const ty = shot.stills[k].type;
-        if (ty === 'click') ev.push({ name: 'tap', at: s.start + x - 0.05, vol: 0.45 });
-        if (ty === 'key') ev.push({ name: 'key', at: s.start + x, vol: 0.4 });
-      });
-    }
-    if (s.kind === 'cta') {
-      const t0 = T(0.12), tType = 'alvecapital.fr'.length / 12, tTap = t0 + tType + 1.3;
-      ev.push({ name: 'keys', at: s.start + t0, vol: 0.4 }, { name: 'pop', at: s.start + t0 + tType + 0.3, vol: 0.4 }, { name: 'tap', at: s.start + tTap - 0.05, vol: 0.5 }, { name: 'ding', at: s.start + tTap + 0.1, vol: 0.45 });
-    }
-    if (s.kind === 'outro') ev.push({ name: 'ding', at: s.start + 0.4, vol: 0.45 });
-  });
-  return ev;
-}
-
-// Aperçu déposé sur le dépôt du studio (trop lourd pour un envoi direct).
-export async function publishPreview(file) {
-  const repo = process.env.GH_REPO, tok = process.env.GH_TOKEN;
-  if (!repo || !tok) throw new Error('Jeton du dépôt manquant');
-  const hd = { Authorization: 'Bearer ' + tok, Accept: 'application/vnd.github+json', 'User-Agent': 'alve-studio' };
-  const tag = 'apercu-' + Date.now();
-  const rel = await (await fetch('https://api.github.com/repos/' + repo + '/releases', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, hd), body: JSON.stringify({ tag_name: tag, name: 'Aperçu ' + tag, prerelease: true }) })).json();
-  if (!rel.upload_url) throw new Error('Dépôt de l’aperçu refusé : ' + JSON.stringify(rel).slice(0, 200));
-  const buf = readFileSync(file);
-  const r = await fetch(rel.upload_url.replace(/\{.*\}$/, '') + '?name=apercu.mp4', { method: 'POST', headers: Object.assign({ 'Content-Type': 'video/mp4', 'Content-Length': String(buf.length) }, hd), body: buf });
-  const j = await r.json().catch(() => ({}));
-  if (!j.browser_download_url) throw new Error('Envoi de l’aperçu échoué (' + r.status + ')');
-  return j.browser_download_url;
-}
-
-export async function voices(job, DIR) {
-  let cloned = null;
-  if (false) { // voix Henri uniquement
-    try { cloned = await cloneVoices(DIR, job.clone_voice_url, job.scenes); console.log('Voix clonée prête'); }
-    catch (e) { console.error('Clonage impossible, voix Henri utilisée : ' + String((e && e.message) || e).slice(-300)); }
-  }
-  const files = [], durs = [];
-  let clonedCount = 0;
-  for (const [i, s] of job.scenes.entries()) {
-    let f = cloned && cloned[i], d = f ? await duration(f).catch(() => 0) : 0;
-    if (d > 0.4) clonedCount++;
-    else { f = join(DIR, 'v' + i + '.mp3'); await download(s.audio_url, f); d = await duration(f); }
-    if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
-    files.push(f); durs.push(d);
-  }
-  console.log('Voix : ' + clonedCount + ' / ' + job.scenes.length + ' scènes avec la voix clonée');
-  return { files, durs, voice: clonedCount === job.scenes.length ? 'clone' : 'henri' };
-}
-
-export async function runLong(job, DIR) {
-  // 1) Les vrais écrans d'abord : une session expirée arrête tout de suite.
-  const shots = await loadShots(await captureScreens(job, DIR));
-  // 2) La voix.
-  const vo = await voices(job, DIR);
-  const tl = buildTimeline(job.scenes, vo.durs);
-  console.log('Vidéo longue : ' + tl.scenes.length + ' scènes, ' + tl.total.toFixed(1) + ' s');
-  tl.scenes.forEach((s, i) => {
-    if (s.screen && s.screen.path) { s.shotKey = screenKey(s.screen); s.shotScreen = s.screen; }
-    else if (s.kind === 'chapter') {
-      const nx = tl.scenes.slice(i + 1).find((x) => x.screen && x.screen.path);
-      if (nx && nx.chapter === s.chapter) { s.shotKey = screenKey(nx.screen); s.shotScreen = { path: nx.screen.path, from: nx.screen.from || 0, to: nx.screen.from || 0, static: true }; }
-    }
-  });
-  const r = seeded(7);
-  const env = {
-    F: await loadFonts(DIR), total: tl.total, chapters: {}, marks: [], shots,
-    particles: Array.from({ length: 50 }, () => ({ x: r() * W, y: r() * H, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
-    bg: await loadImg((job.backgrounds || [])[0]), logo: await loadImg(job.logo_url),
-  };
-  if (!env.logo) throw new Error('Logo du site introuvable');
+// Reconstruit l'habillage dans le processus du segment.
+export async function buildEnv(spec, DIR) {
+  const fd = join(DIR, 'fonts-' + process.pid); mkdirSync(fd, { recursive: true });
+  const logoUrl = job.logo_url;
+  if (!(await loadImg(logoUrl))) throw new Error('Logo du site introuvable');
+  const env = { shots, chapters: {}, marks: [] };
   // Plans d'illustration (bibliothèque du site) téléchargés une seule fois.
   env.brolls = {};
   const urls = [...new Set(tl.scenes.map((s) => s.broll).filter(Boolean))];
@@ -463,7 +387,8 @@ export async function runLong(job, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(env.brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  await render(env, tl, video);
+  const spec = { total: tl.total, chapters: env.chapters, marks: env.marks, shots, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls: env.brolls };
+  await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
   await mixAudio(DIR, tl, vo.files, events(tl, env), audio);
