@@ -19,6 +19,7 @@ import { captureScreens, screenKey } from './capture.mjs';
 import { loadShots, screenState, drawPhone, stepTimes } from './phone.mjs';
 import { Broll } from './broll.mjs';
 import { VISUALS, visualSfx } from './visuals.mjs';
+import { LOOKS, lookSfx, lookImages, finishFx } from './cine.mjs';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from './draw.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
@@ -278,13 +279,13 @@ function drawSubs(ctx, env, s, t, cx) {
   });
 }
 
-function drawHud(ctx, env, s, t) {
+function drawHud(ctx, env, s, t, light) {
   ctx.globalAlpha = 1;
-  if (s.kind !== 'intro' && s.kind !== 'outro') {
+  if (s.kind !== 'intro' && s.kind !== 'outro' && !(s.look && s.look.nohud)) {
     logo(ctx, env, COL.x + 26, 66, 54, 0);
-    font(ctx, 30, env.F.display); ctx.textAlign = 'left'; ctx.fillStyle = rgba(P.ink, 0.92);
+    font(ctx, 30, env.F.display); ctx.textAlign = 'left'; ctx.fillStyle = light ? '#0B1020' : rgba(P.ink, 0.92);
     ctx.fillText('AL VE CAPITAL', COL.x + 66, 64);
-    font(ctx, 20, env.F.sb); ctx.fillStyle = rgba(P.ink, 0.5); ctx.fillText('alvecapital.fr', COL.x + 66, 90);
+    font(ctx, 20, env.F.sb); ctx.fillStyle = light ? 'rgba(11,16,32,0.55)' : rgba(P.ink, 0.5); ctx.fillText('alvecapital.fr', COL.x + 66, 90);
   }
   const y = H - 8;
   ctx.fillStyle = rgba(P.ink, 0.1); ctx.fillRect(0, y, W, 8);
@@ -314,6 +315,17 @@ function phone(ctx, env, tl, i, t) {
 
 function drawFrame(ctx, env, tl, i, t) {
   const s = tl.scenes[i];
+  const look = s.look && LOOKS[s.look.type];
+  if (look) {
+    const lt = t - s.start;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    const r = look(ctx, env, s, lt, t) || {};
+    if (r.phone) phone(ctx, env, tl, i, t);
+    if (r.subs) drawSubs(ctx, env, s, t, W / 2);
+    drawHud(ctx, env, s, t, r.light);
+    finishFx(ctx, s, lt);
+    return;
+  }
   background(ctx, env, s, t);
   phone(ctx, env, tl, i, t);
   const lt = t - s.start;
@@ -337,6 +349,7 @@ function drawFrame(ctx, env, tl, i, t) {
   const side = (s.shotKey && env.shots[s.shotKey]) || vz;
   drawSubs(ctx, env, s, t, side ? COL.cx : W / 2);
   drawHud(ctx, env, s, t);
+  finishFx(ctx, s, t - s.start);
 }
 
 // Montage découpé en segments d'une minute, chacun dans un processus séparé :
@@ -380,8 +393,9 @@ export async function buildEnv(spec, DIR) {
     F: spec.F, total: spec.total, chapters: spec.chapters, marks: spec.marks, brolls: spec.brolls, brollDur: spec.brollDur || {},
     shots: await loadShots(spec.raw),
     particles: Array.from({ length: 50 }, () => ({ x: r() * W, y: r() * H, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
-    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo),
+    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo), imgs: {},
   };
+  for (const u of spec.imgs || []) env.imgs[u] = await loadImg(u);
   if (!env.logo) throw new Error('Logo du site introuvable');
   return env;
 }
@@ -426,6 +440,7 @@ export async function renderSegment(env, tl, f0, f1, out) {
 function events(tl, env) {
   const ev = [];
   tl.scenes.forEach((s) => {
+    if (s.look) for (const [name, at, vol] of lookSfx(s)) ev.push({ name, at: s.start + at, vol });
     if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
     if (s.kind === 'chapter') ev.push({ name: 'rise', at: s.start - 0.4, vol: 0.3 }, { name: 'impact', at: s.start + 0.35, vol: 0.55 });
     if (s.kind === 'point') ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.35 });
@@ -510,7 +525,7 @@ export async function runLong(job, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const spec = { F, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur };
+  const spec = { F, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes) };
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
