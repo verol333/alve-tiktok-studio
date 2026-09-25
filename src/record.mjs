@@ -44,6 +44,36 @@ function cursorScript() {
   setInterval(make, 400);
 }
 
+// Encadré qui se dessine autour d'une zone (ou surligneur façon feutre), DANS la
+// page : il suit exactement le vrai site, zooms compris.
+function ringScript() {
+  window.__studioRing = (x, y, w, h, kind, color, hold) => {
+    const ns = 'http://www.w3.org/2000/svg', marker = kind === 'marker', pad = marker ? 3 : 8;
+    const c = color || '#FACC15', W2 = w + pad * 2, H2 = h + pad * 2;
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;z-index:2147483645;pointer-events:none;left:' + (x - pad) + 'px;top:' + (y - pad) + 'px;width:' + W2 + 'px;height:' + H2 + 'px;transition:opacity .45s';
+    if (marker) {
+      const m = document.createElement('div');
+      m.style.cssText = 'position:absolute;left:0;top:0;height:100%;width:0;border-radius:6px;background:' + (color || 'rgba(250,204,21,.34)') + ';transform:skewX(-10deg);transition:width .6s cubic-bezier(.3,.7,.2,1)';
+      d.appendChild(m);
+      requestAnimationFrame(() => requestAnimationFrame(() => { m.style.width = '100%'; }));
+    } else {
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('width', W2); svg.setAttribute('height', H2); svg.style.overflow = 'visible';
+      const r = document.createElementNS(ns, 'rect');
+      [['x', 2], ['y', 2], ['width', W2 - 4], ['height', H2 - 4], ['rx', 14], ['fill', 'none'], ['stroke', c], ['stroke-width', 4], ['stroke-linecap', 'round']].forEach(([k, v]) => r.setAttribute(k, v));
+      const len = 2 * (W2 + H2);
+      r.style.cssText = 'filter:drop-shadow(0 0 7px ' + c + ');stroke-dasharray:' + len + ';stroke-dashoffset:' + len + ';transition:stroke-dashoffset .75s cubic-bezier(.3,.7,.2,1)';
+      svg.appendChild(r); d.appendChild(svg);
+      requestAnimationFrame(() => requestAnimationFrame(() => { r.style.strokeDashoffset = '0'; }));
+    }
+    document.body.appendChild(d);
+    setTimeout(() => { d.style.opacity = '0'; setTimeout(() => d.remove(), 500); }, hold || 2800);
+  };
+}
+
+const normW = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
 // Masque les numéros de téléphone et adresses mail affichés par le site.
 function maskScript() {
   const PHONE = /(?:\+|00)\d[\d\s.-]{7,}\d|\b(?:0\d|2\d\d)\d(?:[\s.-]?\d){6,}\b/g;
@@ -109,6 +139,25 @@ async function bring(page, loc) {
 }
 
 async function act(page, a, mark) {
+  if (a.scrollBy != null) {
+    const cur = await page.evaluate(() => window.scrollY);
+    return act(page, { dur: a.dur, scroll: Math.max(0, cur + a.scrollBy) }, mark);
+  }
+  // Encadre (ou surligne) une zone précise pendant que la voix en parle.
+  if (a.ring) {
+    const loc0 = await locate(page, a.soft ? { ...a.ring, timeout: 6000 } : a.ring);
+    const loc = a.ring.up ? loc0.locator('xpath=' + Array(a.ring.up).fill('..').join('/')) : loc0;
+    let box = await loc.boundingBox();
+    if (!box || box.y < 50 || box.y + box.height > VH - 30) {
+      await loc.evaluate((e) => e.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      await wait(900); box = await loc.boundingBox();
+    }
+    if (!box) throw new Error('zone à encadrer introuvable');
+    await page.evaluate(([b, k, c, h]) => window.__studioRing(b.x, b.y, b.width, b.height, k, c, h), [box, a.kind || 'box', a.color || null, a.hold || 2800]);
+    mark('ring');
+    await wait(a.wait || 300);
+    return;
+  }
   if (a.scroll != null) {
     const ms = a.dur || 2200;
     const cur = await page.evaluate(() => window.scrollY);
@@ -146,7 +195,10 @@ async function act(page, a, mark) {
   await wait(a.wait || 1500);
 }
 
-export async function recordWalkthrough(job, dir) {
+// plan[i] = { dur, words: [{ n, t }] } : durée de la scène et instant de chaque
+// mot prononcé. Chaque geste part au moment où la voix dit son mot (« say »),
+// et la scène est filmée exactement le temps de sa voix : rien n'est accéléré.
+export async function recordWalkthrough(job, dir, plan) {
   const list = job.scenes.map((s, i) => [s, i]).filter(([s]) => s.walk);
   if (!list.length) return { file: null, segs: {} };
   if (!job.site_token) throw new Error('Session du site absente : ouvrez l’application en administrateur puis relancez la vidéo');
@@ -160,6 +212,7 @@ export async function recordWalkthrough(job, dir) {
   });
   await ctx.addInitScript(initScript, job.site_token);
   await ctx.addInitScript(cursorScript);
+  await ctx.addInitScript(ringScript);
   await ctx.addInitScript(maskScript);
   const page = await ctx.newPage();
   const T0 = Date.now(), now = () => (Date.now() - T0) / 1000;
@@ -176,10 +229,26 @@ export async function recordWalkthrough(job, dir) {
           await closeInvites(page); await wait(300);
         }
         const seg = { start: now(), ev: [] };
+        const P = (plan && plan[i]) || null;
+        let wk = 0;
         for (const a of w.acts || []) {
+          if (P) {
+            let at = null;
+            if (a.say) {
+              const n = normW(a.say);
+              const k = P.words.findIndex((x, j) => j >= wk && x.n && x.n.startsWith(n));
+              if (k >= 0) { wk = k + 1; at = P.words[k].t; } else console.log('Scène ' + (i + 1) + ' : mot « ' + a.say + ' » absent de la voix');
+            } else if (a.at != null) at = a.at * P.dur;
+            if (at != null) {
+              const lead = a.early != null ? a.early : (a.tap || a.fill || a.point) ? 1.05 : a.center ? 0.8 : 0.1;
+              const ms = (seg.start + at - lead - now()) * 1000;
+              if (ms > 0) await wait(ms);
+            }
+          }
           try { await act(page, a, (type) => seg.ev.push({ type, at: now() - seg.start })); }
           catch (e) { if (!a.soft) throw e; console.log('Scène ' + (i + 1) + ' : geste facultatif ignoré (' + String(e.message || e).split('\n')[0].slice(0, 120) + ')'); }
         }
+        if (P) { const ms = (seg.start + P.dur - 0.05 - now()) * 1000; if (ms > 0) await wait(ms); }
         seg.end = now(); segs[i] = seg;
         console.log('Scène ' + (i + 1) + ' filmée sur le site : ' + (seg.end - seg.start).toFixed(1) + ' s');
       } catch (e) {
