@@ -383,7 +383,7 @@ function events(tl, env) {
     if (s.shotKey && env.shots[s.shotKey]) {
       const shot = env.shots[s.shotKey];
       stepTimes(shot, s.shotScreen, s.dur).forEach((x, k) => {
-        if (x < 0) return;
+        if (x < 0 || !Number.isFinite(x)) return;
         const ty = shot.stills[k].type;
         if (ty === 'click') ev.push({ name: 'tap', at: s.start + x - 0.05, vol: 0.45 });
         if (ty === 'key') ev.push({ name: 'key', at: s.start + x, vol: 0.4 });
@@ -443,7 +443,7 @@ export async function runLong(job, DIR) {
     if (s.screen && s.screen.path) { s.shotKey = screenKey(s.screen); s.shotScreen = s.screen; }
     else if (s.kind === 'chapter') {
       const nx = tl.scenes.slice(i + 1).find((x) => x.screen && x.screen.path);
-      if (nx && nx.chapter === s.chapter) { s.shotKey = screenKey(nx.screen); s.shotScreen = { path: nx.screen.path, from: nx.screen.from || 0, to: nx.screen.from || 0 }; }
+      if (nx && nx.chapter === s.chapter) { s.shotKey = screenKey(nx.screen); s.shotScreen = { path: nx.screen.path, from: nx.screen.from || 0, to: nx.screen.from || 0, static: true }; }
     }
   });
   const r = seeded(7);
