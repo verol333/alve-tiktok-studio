@@ -9,7 +9,7 @@ on:
       api:
         required: true
 concurrency:
-  group: render
+  group: render-${{ inputs.script_id }}
   cancel-in-progress: false
 permissions:
   contents: write
