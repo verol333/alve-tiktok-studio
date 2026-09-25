@@ -93,6 +93,7 @@ async function act(page, a, mark) {
     await smoothScroll(page, a.scroll, ms); await wait(300);
     return;
   }
+  if (a.press) { await page.keyboard.press(a.press); await wait(a.wait || 900); return; }
   const target = a.tap || a.point || (a.fill ? (typeof a.fill === 'string' ? { placeholder: a.fill } : a.fill) : null);
   if (!target) { await wait(a.wait || 500); return; }
   const loc = await locate(page, a.soft ? { ...target, timeout: 5000 } : target);
