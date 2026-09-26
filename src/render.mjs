@@ -8,6 +8,7 @@ import { createCanvas } from '@napi-rs/canvas';
 import { W, H, FPS } from './draw.mjs';
 import { drawBackground, drawHud, drawSubs } from './hud.mjs';
 import { drawScene } from './scenes.mjs';
+import { drawV2, closeBg } from './v2/index.mjs';
 import { run } from './sh.mjs';
 
 // Chaque image lue sur le canevas garde ~8 Mo que le processus ne rend jamais :
@@ -54,15 +55,14 @@ export async function renderFrames(env, tl, f0, f1, out) {
   for (let f = f0; f < f1; f++) {
     const t = f / FPS;
     const sc = tl.scenes.find((s) => t >= s.start && t < s.start + s.dur) || tl.scenes[tl.scenes.length - 1];
-    drawBackground(ctx, env, t);
-    drawScene(ctx, env, sc, t);
-    drawSubs(ctx, env, sc, t);
-    drawHud(ctx, env, t);
+    if (env.style.theme) await drawV2(ctx, env, sc, t);
+    else { drawBackground(ctx, env, t); drawScene(ctx, env, sc, t); drawSubs(ctx, env, sc, t); drawHud(ctx, env, t); }
     const img = ctx.getImageData(0, 0, W, H);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
     if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
     if ((f - f0) % 300 === 0) console.log('image ' + f + ' / ' + frames + ' — ' + mem());
   }
+  closeBg(env);
   ff.stdin.end();
   const [code] = await once(ff, 'close');
   if (code !== 0) throw new Error('Encodage vidéo échoué : ' + errTail.slice(-300));
