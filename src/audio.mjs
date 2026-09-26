@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { run, duration } from './sh.mjs';
 import { download } from './api.mjs';
 import { comboRevealAt } from './scenes.mjs';
+import { fxEvents } from './fx.mjs';
 
 // Bruitages et musique douce fabriqués sur place (aucun fichier sous droits).
 export async function makeSfx(dir, total) {
@@ -29,7 +30,7 @@ export async function makeSfx(dir, total) {
 export async function tightVoice(src, out) {
   const edge = (keep) => 'silenceremove=start_periods=1:start_threshold=-42dB:start_silence=' + keep;
   const af = [edge(0.03), 'areverse', edge(0.06), 'areverse',
-    'silenceremove=stop_periods=-1:stop_duration=0.35:stop_threshold=-42dB:stop_silence=0.2'].join(',');
+    'silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-42dB:stop_silence=0.35'].join(',');
   try {
     await run('ffmpeg', ['-y', '-i', src, '-af', af, '-ar', '44100', '-ac', '1', out]);
     const a = await duration(src), b = await duration(out);
@@ -40,7 +41,7 @@ export async function tightVoice(src, out) {
 }
 
 export function sfxEvents(tl, env) {
-  const ev = [];
+  const ev = fxEvents(tl, env);
   // « Pop » discret à l'instant exact où un chiffre est prononcé (sous-titres calés).
   tl.scenes.forEach((s) => {
     if (!s.aligned || s.kind === 'hook') return;
