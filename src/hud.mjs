@@ -71,7 +71,7 @@ export function drawSubs(ctx, env, sc, t) {
   if (!sc || sc.kind === 'hook' || !sc.words.length) return;
   const lt = t - sc.voiceAt;
   if (lt < 0) return;
-  const d = sc.voiceDur * 0.96;
+  const d = sc.voiceDur * (sc.aligned ? 1 : 0.96);
   let k = sc.words.findIndex((w) => lt < w.end * d);
   if (k < 0) k = sc.words.length - 1;
   const chunk = sc.chunks.find((c) => k >= c.from && k <= c.to) || sc.chunks[0];
