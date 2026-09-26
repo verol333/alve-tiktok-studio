@@ -38,7 +38,7 @@ async function keyFrames(file, tl, type) {
   const add = (s, off) => { if (s) times.push(off < 0 ? s.start + s.dur + off : Math.min(s.start + off, s.start + s.dur - 0.2)); };
   const plan = type === 'site'
     ? [['hook', 0.8], ['card', 1.8], ['calc', 2.6], ['outcomes', -0.3], ['outro', 1.5]]
-    : [['hook', 0.8], ['match', 1.6], ['pick', 2.0], ['combo', -0.3], ['outro', 1.5]];
+    : [['hook', 0.8], ['match', 1.6], ['pick', 2.0], ['combo', -1.2], ['outro', 1.5]];
   for (const [k, off] of plan) add(by(k), off);
   if (type === 'reel') { times.length = 0; for (const f of [0.04, 0.28, 0.5, 0.72, 0.93]) times.push(tl.total * f); }
   const out = [];
