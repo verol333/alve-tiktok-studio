@@ -15,7 +15,10 @@ const HUES = {
   mint: ['#33D98E', '#0EA5E9'], indigo: ['#818CF8', '#C084FC'], gold: ['#F3C969', '#FB923C'],
   red: ['#F87171', '#FB7185'], cyan: ['#22D3EE', '#818CF8'],
 };
-const hue = (s) => HUES[(s.look && s.look.hue) || 'mint'] || HUES.mint;
+// Identité visuelle de la vidéo : ses couleurs remplacent les teintes d'origine.
+let LOOK = null;
+export function setLook(l) { LOOK = l || null; }
+const hue = (s) => LOOK ? (['indigo', 'red'].includes(s.look && s.look.hue) ? [LOOK.hot, LOOK.accent] : [LOOK.accent, LOOK.hot]) : (HUES[(s.look && s.look.hue) || 'mint'] || HUES.mint);
 const T = (s, f) => (s.voiceAt - s.start) + s.voiceDur * f;
 const norm = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
 const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -291,7 +294,7 @@ export const LOOKS = {
       ctx.fillStyle = acc; ctx.fillRect(W / 2 - 60 * a, 212, 120 * a, 4);
       ctx.restore();
     }
-    textFlow(ctx, s, lt, t, Object.assign({ cx: W / 2, cy: H / 2 + 30, w: W - 360, size: 150, min: 84, lines: 2, fam: env.F.display, upper: true, color: light ? INK : '#FFFFFF', acc, chars: 26 }, VERT ? { w: 1160, min: 76, lines: 4, chars: 22 } : {}));
+    textFlow(ctx, s, lt, t, Object.assign({ cx: W / 2, cy: H / 2 + 30, w: W - 360, size: 150, min: 84, lines: 2, fam: env.F.kin || env.F.display, upper: true, color: light ? INK : '#FFFFFF', acc, chars: 26 }, VERT ? { w: 1160, min: 76, lines: 4, chars: 22 } : {}));
     return { light, subs: false };
   },
 

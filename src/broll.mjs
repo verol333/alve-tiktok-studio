@@ -6,13 +6,13 @@ import { createCanvas } from '@napi-rs/canvas';
 const BW = 1280, BH = 720, FS = BW * BH * 4;
 
 export class Broll {
-  constructor(file, start) {
+  constructor(file, start, vf) {
     this.canvas = createCanvas(BW, BH);
     this.ctx = this.canvas.getContext('2d');
     this.img = this.ctx.createImageData(BW, BH);
     this.chunks = []; this.len = 0; this.ended = false; this.waiters = []; this.has = false;
     this.p = spawn('ffmpeg', ['-v', 'error', '-stream_loop', '-1', '-ss', String(start || 1), '-i', file,
-      '-vf', 'scale=' + BW + ':' + BH + ':force_original_aspect_ratio=increase,crop=' + BW + ':' + BH + ',fps=30',
+      '-vf', 'scale=' + BW + ':' + BH + ':force_original_aspect_ratio=increase,crop=' + BW + ':' + BH + ',fps=30' + (vf ? ',' + vf : ''),
       '-an', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-'], { stdio: ['ignore', 'pipe', 'ignore'] });
     this.p.stdout.on('data', (d) => { this.chunks.push(d); this.len += d.length; if (this.len > FS * 3) this.p.stdout.pause(); this.wake(); });
     this.p.on('close', () => { this.ended = true; this.wake(); });

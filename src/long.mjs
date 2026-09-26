@@ -11,7 +11,7 @@ import { once } from 'node:events';
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import { api, download } from './api.mjs';
 import { run, duration } from './sh.mjs';
-import { loadFonts, loadImg } from './assets.mjs';
+import { loadFonts, loadImg, loadLookFont } from './assets.mjs';
 import { buildTimeline } from './timeline.mjs';
 import { makeSfx, mixAudio, libraryMusic } from './audio.mjs';
 import { cloneVoices } from './clone.mjs';
@@ -19,7 +19,7 @@ import { captureScreens, screenKey } from './capture.mjs';
 import { loadShots, screenState, drawPhone, stepTimes, PH } from './phone.mjs';
 import { Broll } from './broll.mjs';
 import { VISUALS, visualSfx } from './visuals.mjs';
-import { LOOKS, lookSfx, lookImages, finishFx, setStage } from './cine.mjs';
+import { LOOKS, lookSfx, lookImages, finishFx, setStage, setLook } from './cine.mjs';
 import { Clip } from './clip.mjs';
 import { drawWalkPhone, CW, CH } from './walkPhone.mjs';
 import { alignScenes } from './align.mjs';
@@ -529,12 +529,13 @@ async function segment(specFile, [f0, f1, out], k) {
 export async function buildEnv(spec, DIR) {
   for (const name of Object.values(spec.F)) GlobalFonts.registerFromPath(join(DIR, name + '.ttf'), name);
   if (spec.vertical) { SW = 1080; SH = 1920; VERT = true; setStage(SW, SH); }
+  setLook(spec.look);
   const r = seeded(7);
   const env = {
     F: spec.F, total: spec.total, chapters: spec.chapters, marks: spec.marks, brolls: spec.brolls, brollDur: spec.brollDur || {},
     shots: await loadShots(spec.raw),
     particles: Array.from({ length: 50 }, () => ({ x: r() * SW, y: r() * SH, v: 15 + r() * 45, s: 2 + r() * 4, a: 0.1 + r() * 0.25 })),
-    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo), imgs: {}, walk: spec.walk || null,
+    bg: await loadImg(spec.bg), logo: await loadImg(spec.logo), imgs: {}, walk: spec.walk || null, look: spec.look || null,
   };
   for (const u of spec.imgs || []) env.imgs[u] = await loadImg(u);
   if (!env.logo) throw new Error('Logo du site introuvable');
@@ -563,7 +564,7 @@ export async function renderSegment(env, tl, f0, f1, out) {
         const d = env.brollDur[sc.broll] || 0;
         let at = (sc.broll_start || 1) + Math.max(0, t - sc.start);
         if (d > 2) at = at % (d - 0.5);
-        reader = new Broll(file, at);
+        reader = new Broll(file, at, env.look && env.look.grade_vf);
       }
       // Scène filmée sur le site : l'extrait reprend au bon endroit.
       if (sc.seg && env.walk) {
@@ -696,6 +697,9 @@ export async function runLong(job, DIR) {
     }
   });
   const F = await loadFonts(DIR);
+  // Police « affiche » de l'identité visuelle de cette vidéo.
+  const look = (job.style || {}).look || null;
+  if (look) { const fam = await loadLookFont(DIR, look.font).catch(() => null); if (fam) F.kin = fam; }
   const logoUrl = job.logo_url;
   if (!(await loadImg(logoUrl))) throw new Error('Logo du site introuvable');
   const env = { shots, chapters: {}, marks: [] };
@@ -709,7 +713,7 @@ export async function runLong(job, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const spec = { vertical: (job.style || {}).format === 'vertical', F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes) };
+  const spec = { vertical: (job.style || {}).format === 'vertical', F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes), look };
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
