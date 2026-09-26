@@ -83,13 +83,17 @@ async function main() {
   await alignScenes(tl, voiceFiles, DIR);
   // YouTube Shorts : jusqu'à 3 min ; Facebook reçoit sa version coupée à 90 s.
   if (tl.total < 12 || tl.total > 180) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
+  if (style.theme) { const { downloadClips } = await import('./v2/index.mjs'); await downloadClips(job.scenes, DIR); }
   const env = await buildEnv(job, tl, DIR);
   console.log('Logos chargés : ' + env.logos.map((l) => (l.home ? 1 : 0) + (l.away ? 1 : 0)).join(',') + ' — durée ' + tl.total.toFixed(1) + ' s');
 
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
   await renderVideo({ job, particles: env.particles }, tl, video, DIR);
   await makeSfx(DIR, tl.total);
-  await mixAudio(DIR, tl, voiceFiles, sfxEvents(tl, env), audio);
+  let events;
+  if (style.theme) { const { makeV2Sfx, v2Events } = await import('./v2/sound.mjs'); await makeV2Sfx(DIR, tl.total, style.theme); events = v2Events(tl, env); }
+  else events = sfxEvents(tl, env);
+  await mixAudio(DIR, tl, voiceFiles, events, audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
   return deliver(job, final, tl, audio, env.type, cloned ? 'clone' : 'henri');
 }
