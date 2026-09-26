@@ -77,7 +77,8 @@ async function main() {
     voiceFiles.push(f); durs.push(d);
   }
   const tl = buildTimeline(job.scenes, durs);
-  if (tl.total < 12 || tl.total > 90) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
+  // YouTube Shorts : jusqu'à 3 min ; Facebook reçoit sa version coupée à 90 s.
+  if (tl.total < 12 || tl.total > 180) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
   const env = {
     pal: PALETTES[style.palette] || PALETTES.emerald,
     style: Object.assign({ hook_style: 'slam', subtitle_style: 'pill' }, style),
