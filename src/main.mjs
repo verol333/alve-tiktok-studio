@@ -132,6 +132,7 @@ async function deliver(job, final, tl, audio, type, voice) {
         await run('ffmpeg', ['-y', '-i', fbFile, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fprev]);
         await api('preview', { video_url: await publishPreview(fprev), voice, cut: 'facebook' }).catch((e) => console.error('Aperçu Facebook : ' + e.message));
       }
+    }
   }
 
   const metrics = await checks(final, tl, audio);
