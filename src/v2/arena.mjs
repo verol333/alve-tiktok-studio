@@ -1,6 +1,6 @@
 // Style « Face-à-face » : affiche de combat. Écran coupé aux couleurs des
 // deux clubs, logos qui s'entrechoquent, étincelles, tampon « verdict ».
-import { W, H, clamp, prog, easeOut, easeBack, rr, font, seeded, lerp, idx, mix, txt, fit, lines, disc, check, subscribe, kinetic, subs } from './kit.mjs';
+import { W, H, clamp, prog, easeOut, easeBack, rr, font, seeded, lerp, idx, mix, txt, fit, lines, disc, check, subscribe, kinetic, subs, brand } from './kit.mjs';
 import { COLLIDE, coteT, confT, scoreT, rowT, totalT, subT, resultT } from './timing.mjs';
 import { bgFrame } from './bg.mjs';
 
@@ -217,7 +217,7 @@ function results(ctx, env, sc, t, lt) {
   const F = env.F, pr = env.proof || {}, wins = (pr.wins || []).slice(0, 3), n = wins.length;
   hot(ctx, env, pr.ours ? n + ' SUR ' + n + " HIER" : 'DÉJÀ VALIDÉS', 540, 430, 120, flicker(lt, 0));
   wins.forEach((w, k) => {
-    const at = resultT(sc, k, n), q = prog(lt, at, 0.2);
+    const at = resultT(sc, k, n, w.team_home), q = prog(lt, at, 0.2);
     if (q <= 0) return;
     const y = 500 + k * 240, e = easeOut(q), L = env.proofLogos[k] || {};
     ctx.save(); ctx.translate((k % 2 ? 1 : -1) * (1 - e) * 1100, 0);
@@ -239,6 +239,7 @@ function results(ctx, env, sc, t, lt) {
 
 function site(ctx, env, sc, t, lt) {
   const F = env.F;
+  { const e = easeBack(prog(lt, 0, 0.4)); ctx.save(); ctx.shadowColor = '#FFB020'; ctx.shadowBlur = 60; brand(ctx, env, 540, 470, 260 * e); ctx.restore(); }
   txt(ctx, 'RENDEZ-VOUS SUR', 540, 720, 90, F.display, '#FFFFFF', 'center', 10);
   const on = lt > 0.4 && !(lt > 0.5 && lt < 0.58) && !(lt > 0.7 && lt < 0.74);
   if (on) {
@@ -281,8 +282,9 @@ function chrome(ctx, env, t) {
   ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, 0, W, 6);
   const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, '#FF4D00'); g.addColorStop(1, '#FFF3B0');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W * clamp(t / env.total, 0, 1), 6);
-  txt(ctx, 'AL VE CAPITAL', 48, 120, 52, F.display, '#FFFFFF', 'left', 8);
-  txt(ctx, '18+  ·  JOUE RESPONSABLE', 50, 160, 22, F.sb, 'rgba(255,255,255,0.75)', 'left');
+  const lx = brand(ctx, env, 96, 118, 96) ? 158 : 48;
+  txt(ctx, 'AL VE CAPITAL', lx, 120, 52, F.display, '#FFFFFF', 'left', 8);
+  txt(ctx, '18+  ·  JOUE RESPONSABLE', lx + 2, 160, 22, F.sb, 'rgba(255,255,255,0.75)', 'left');
 }
 
 function flash(ctx, env, t) {
