@@ -35,7 +35,7 @@ jobs:
       - name: Navigateur (vrais écrans du site)
         run: npx playwright install --with-deps chromium > /dev/null
       - name: Montage
-        run: node src/main.mjs
+        run: node --expose-gc src/main.mjs
         env:
           SCRIPT_ID: ${{ inputs.script_id }}
           JOB_TOKEN: ${{ inputs.token }}
