@@ -1,5 +1,6 @@
 import { W, H, clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, fitSingle, drawWords, isHi, tc, shakeAt, seeded } from './draw.mjs';
 import { SITE_DRAW } from './site.mjs';
+import { sceneFx, wipeBars, lightLeak, finish } from './fx.mjs';
 
 const caps = (s) => String(s || '').toUpperCase().replace(/ALVECAPITAL\.FR/g, 'alvecapital.fr');
 const hhmm = (iso) => { try { return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Brazzaville' }).format(new Date(iso)); } catch (e) { return ''; } };
@@ -193,7 +194,6 @@ function combo(ctx, env, sc, lt) {
     tc(ctx, val.toFixed(2), 0, 0, 190, F.display, pal.hi, rgba(pal.hi, 0.7));
     ctx.restore();
   }
-  confetti(ctx, env, lt - (at + 0.9), 540, yT + 120);
 }
 
 function teaser(ctx, env, sc, lt) {
@@ -288,6 +288,8 @@ export function drawScene(ctx, env, sc, t) {
   const lt = t - sc.start, L = env.layer.getContext('2d');
   L.setTransform(1, 0, 0, 1, 0, 0); L.globalAlpha = 1; L.shadowBlur = 0; L.clearRect(0, 0, W, H);
   (DRAW[sc.kind] || retention)(L, env, sc, lt);
+  L.setTransform(1, 0, 0, 1, 0, 0); L.globalAlpha = 1; L.shadowBlur = 0;
+  sceneFx(L, env, sc, lt);
   L.setTransform(1, 0, 0, 1, 0, 0); L.globalAlpha = 1;
   const list = env.style.transitions, trans = sc.index === 0 ? 'none' : list[sc.index % list.length];
   const p = easeOut(prog(lt, 0, 0.32)), out = prog(lt, sc.dur - 0.16, 0.16);
@@ -296,6 +298,7 @@ export function drawScene(ctx, env, sc, t) {
   else if (trans === 'slide') { dy = (1 - p) * 320; alpha = p; }
   else if (trans === 'whip') dx = (1 - p) * (sc.index % 2 ? 1 : -1) * 1100;
   if (sc.dur > 3) s *= 1 + 0.04 * Math.sin(Math.PI * prog(lt, sc.dur * 0.55, 0.3));
+  s *= 1 + 0.03 * (lt / sc.dur); // lente poussée caméra
   s *= 1 + 0.05 * out; alpha *= 1 - out;
   const sh = shakeOf(env, sc, lt);
   const put = (ox, a) => {
@@ -304,6 +307,12 @@ export function drawScene(ctx, env, sc, t) {
     ctx.drawImage(env.layer, 0, 0); ctx.restore();
   };
   if (trans === 'whip' && p < 1) { put(dx * 1.3, 0.12 * alpha); put(dx * 1.15, 0.25 * alpha); }
+  const iris = sc.index > 0 && sc.index % 3 === 1 && lt < 0.5;
+  if (iris) { ctx.save(); ctx.beginPath(); ctx.arc(540, 960, 40 + 1150 * easeOut(prog(lt, 0, 0.5)), 0, Math.PI * 2); ctx.clip(); }
   put(dx, alpha);
+  if (iris) ctx.restore();
+  if (sc.index > 0 && sc.index % 3 === 2) wipeBars(ctx, env, lt);
+  if (sc.index > 0) lightLeak(ctx, env, lt, sc.index);
+  finish(ctx, t);
   if (trans === 'flash' && lt < 0.25) { ctx.save(); ctx.globalAlpha = 0.85 * (1 - lt / 0.25); ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
 }
