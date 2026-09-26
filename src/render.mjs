@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { freemem } from 'node:os';
 import { once } from 'node:events';
 import { createCanvas } from '@napi-rs/canvas';
 import { W, H, FPS } from './draw.mjs';
@@ -24,7 +25,10 @@ export async function renderVideo(env, tl, out) {
     const img = ctx.getImageData(0, 0, W, H);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
     if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
-    if (f % 150 === 0) console.log('image ' + f + ' / ' + frames);
+    // Chaque image lue réserve 8 Mo que le ramasse-miettes ne libère pas seul :
+    // sans ce nettoyage forcé, une vidéo de 90 s saturait la machine.
+    if (f % 30 === 0 && global.gc) global.gc();
+    if (f % 150 === 0) console.log('image ' + f + ' / ' + frames + ' — mémoire ' + Math.round(process.memoryUsage().rss / 1e6) + ' Mo, libre ' + Math.round(freemem() / 1e6) + ' Mo');
   }
   ff.stdin.end();
   const [code] = await once(ff, 'close');
