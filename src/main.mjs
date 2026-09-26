@@ -26,7 +26,7 @@ async function checks(file, tl, audio) {
   if (!v || v.width !== 1080 || v.height !== 1920) problems.push('format image incorrect');
   if (!a) problems.push('pas de son');
   if (!(Math.abs(dur - tl.total) <= 1)) problems.push('durée incohérente');
-  if (size < 300000 || size > 60000000) problems.push('taille de fichier anormale');
+  if (size < 300000 || size > 60000000) problems.push('taille de fichier anormale (' + (size / 1e6).toFixed(1) + ' Mo)');
   if (mean < -40) problems.push('son trop faible');
   if (problems.length) throw new Error('Contrôle technique : ' + problems.join(', '));
   return { duration: Math.round(dur * 10) / 10, size, mean_volume: mean, scenes: tl.scenes.length };
