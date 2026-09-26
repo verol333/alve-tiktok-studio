@@ -123,7 +123,7 @@ async function deliver(job, final, tl, audio, type, voice) {
     const prev = join(DIR, 'preview.mp4');
     const reel = type === 'reel';
     await run('ffmpeg', ['-y', '-i', final, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', reel ? '24' : '30', '-c:a', 'aac', '-b:a', reel ? '128k' : '96k', '-movflags', '+faststart', prev]);
-    if (reel) {
+    {
       // Trop lourde pour un envoi direct : déposée sur le dépôt du studio.
       const { publishPreview } = await import('./long.mjs');
       await api('preview', { video_url: await publishPreview(prev), voice });
@@ -132,10 +132,6 @@ async function deliver(job, final, tl, audio, type, voice) {
         await run('ffmpeg', ['-y', '-i', fbFile, '-vf', 'scale=720:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', fprev]);
         await api('preview', { video_url: await publishPreview(fprev), voice, cut: 'facebook' }).catch((e) => console.error('Aperçu Facebook : ' + e.message));
       }
-    } else {
-      const b64 = readFileSync(prev).toString('base64');
-      await api('preview', { video: b64, voice }).catch(() => api('preview', { audio: b64, voice })).catch((e) => console.error('Aperçu : ' + e.message));
-    }
   }
 
   const metrics = await checks(final, tl, audio);
