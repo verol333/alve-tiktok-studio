@@ -47,7 +47,7 @@ export async function renderFrames(env, tl, f0, f1, out) {
   const canvas = createCanvas(W, H), ctx = canvas.getContext('2d');
   env.layer = createCanvas(W, H);
   const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', W + 'x' + H, '-r', String(FPS), '-i', '-',
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', '22', '-maxrate', '3200k', '-bufsize', '6400k', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-maxrate', '9000k', '-bufsize', '18000k', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
   let errTail = '';
   ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
   ff.stdin.on('error', () => {});
