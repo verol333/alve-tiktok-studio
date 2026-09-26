@@ -328,7 +328,7 @@ function drawFrame(ctx, env, s, t) {
 async function render(env, tl, out) {
   const canvas = createCanvas(W, H), ctx = canvas.getContext('2d');
   const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', W + 'x' + H, '-r', String(FPS), '-i', '-',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-maxrate', '3200k', '-bufsize', '6400k', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-maxrate', '9000k', '-bufsize', '18000k', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
   let errTail = '';
   ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
   ff.stdin.on('error', () => {});
