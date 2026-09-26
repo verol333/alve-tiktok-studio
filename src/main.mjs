@@ -6,6 +6,7 @@ import { loadFonts, loadImg, loadEmoji } from './assets.mjs';
 import { buildTimeline } from './timeline.mjs';
 import { PALETTES, makeParticles } from './hud.mjs';
 import { renderVideo } from './render.mjs';
+import { buildEnv } from './env.mjs';
 import { makeSfx, mixAudio, sfxEvents } from './audio.mjs';
 import { cloneVoices } from './clone.mjs';
 
@@ -79,28 +80,11 @@ async function main() {
   const tl = buildTimeline(job.scenes, durs);
   // YouTube Shorts : jusqu'à 3 min ; Facebook reçoit sa version coupée à 90 s.
   if (tl.total < 12 || tl.total > 180) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
-  const env = {
-    pal: PALETTES[style.palette] || PALETTES.emerald,
-    style: Object.assign({ hook_style: 'slam', subtitle_style: 'pill' }, style),
-    F: await loadFonts(DIR), total: tl.total, picks: job.picks, totalOdds: Number(job.total_odds) || 2,
-    particles: makeParticles(), emoji: {}, logos: [],
-    type: job.video_type || 'prono', show: job.showcase || null, proof: job.proof || null, when: style.when || '', bookLogos: [],
-    hudSub: style.hud_sub || 'Analyse foot du jour', bgAlpha: job.video_type === 'site' ? 0.2 : 0.9,
-  };
-  if (!Array.isArray(env.style.transitions) || !env.style.transitions.length) env.style.transitions = ['zoom', 'slide', 'whip', 'flash'];
-  env.bg = await loadImg(job.backgrounds[(style.background || 0) % job.backgrounds.length]);
-  for (const p of job.picks) env.logos.push({ home: await loadImg(p.logo_home), away: await loadImg(p.logo_away) });
-  if (env.show) {
-    for (const l of env.show.legs) env.bookLogos.push(await loadImg(l.logo));
-    env.opLogos = [];
-    for (const o of env.show.operators || []) env.opLogos.push({ name: o.name, img: await loadImg(o.logo) });
-    if (env.show.sport_emoji) env.emoji[env.show.sport_emoji] = await loadEmoji(env.show.sport_emoji);
-  }
-  for (const s of job.scenes) if (s.emoji && !(s.emoji in env.emoji)) env.emoji[s.emoji] = await loadEmoji(s.emoji);
+  const env = await buildEnv(job, tl, DIR);
   console.log('Logos chargés : ' + env.logos.map((l) => (l.home ? 1 : 0) + (l.away ? 1 : 0)).join(',') + ' — durée ' + tl.total.toFixed(1) + ' s');
 
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  await renderVideo(env, tl, video);
+  await renderVideo({ job, particles: env.particles }, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await mixAudio(DIR, tl, voiceFiles, sfxEvents(tl, env), audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
