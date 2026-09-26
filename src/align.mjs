@@ -57,7 +57,7 @@ export async function alignScenes(tl, files, DIR) {
   let ok = 0;
   tl.scenes.forEach((s, i) => {
     const w = alignWords(s.text, res[i] || [], s.voiceDur);
-    if (w) { s.words = w; ok++; }
+    if (w) { s.words = w; s.aligned = true; ok++; }
   });
   console.log('Sous-titres calés sur la voix : ' + ok + ' / ' + tl.scenes.length + ' scènes');
 }
