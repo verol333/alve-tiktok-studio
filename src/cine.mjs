@@ -469,6 +469,95 @@ export const LOOKS = {
     return { light: true, subs: true };
   },
 
+  // Coupon combiné : les sélections défilent, la cote totale grimpe à chaque ligne.
+  stack(ctx, env, s, lt, t) {
+    const L = s.look; bgMesh(ctx, s, t);
+    const acc = hue(s)[0], rows = L.rows || [], n = rows.length;
+    const t0 = T(s, 0.04), t1 = T(s, L.end == null ? 0.85 : L.end), st = n ? Math.max(0.05, (t1 - t0) / n) : 1;
+    const pc = clamp((lt - t0) / st, 0, n), shown = Math.min(n, Math.ceil(pc));
+    const a = easeOut(prog(lt, 0, 0.5));
+    const x0 = 110, cw = 1000, top = 120, ch = 850, head = 96, rh = 108, vis = 6;
+    ctx.save(); ctx.globalAlpha *= a; ctx.translate(0, (1 - a) * 90);
+    card(ctx, x0, top, cw, ch, 28, '#FFFFFF', 'rgba(0,0,0,0.55)');
+    ctx.save(); rr(ctx, x0, top, cw, ch, 28); ctx.clip();
+    ctx.fillStyle = INK; ctx.fillRect(x0, top, cw, head);
+    txt(ctx, L.title || 'COUPON COMBINÉ', x0 + 40, top + 62, 30, env.F.xb, '#FFFFFF', 'left');
+    txt(ctx, n + ' SÉLECTIONS', x0 + cw - 40, top + 62, 26, env.F.sb, MUTE_L, 'right');
+    const scroll = Math.max(0, pc - vis);
+    ctx.beginPath(); ctx.rect(x0, top + head, cw, ch - head); ctx.clip();
+    for (let i = 0; i < shown; i++) {
+      const y = top + head + 14 + (i - scroll) * rh;
+      if (y < top + head - rh || y > top + ch) continue;
+      const ra = easeOut(prog(lt, t0 + i * st, 0.3));
+      ctx.save(); ctx.globalAlpha *= ra; ctx.translate((1 - ra) * 70, 0);
+      if (i % 2) { ctx.fillStyle = 'rgba(11,16,32,0.04)'; ctx.fillRect(x0, y, cw, rh); }
+      fitTxt(ctx, (i + 1) + '. ' + rows[i].match, x0 + 40, y + 40, 26, 16, cw - 250, env.F.sb, MUTE_D, 'left');
+      fitTxt(ctx, rows[i].pick, x0 + 40, y + 84, 38, 20, cw - 250, env.F.black, INK, 'left');
+      txt(ctx, fr(rows[i].odd), x0 + cw - 40, y + 76, 54, env.F.display, GREEN, 'right');
+      ctx.restore();
+    }
+    ctx.restore(); ctx.restore();
+    const px = 1500;
+    let prev = 1, cur = 1;
+    for (let i = 0; i < shown; i++) { prev = cur; cur *= rows[i].odd; }
+    const k = shown ? easeOut(prog(lt, t0 + (shown - 1) * st, 0.25)) : 0;
+    const done = lt >= t1 + 0.1;
+    const val = done && L.total ? L.total : prev + (cur - prev) * k;
+    const b = easeOut(prog(lt, 0.2, 0.5));
+    ctx.save(); ctx.globalAlpha *= b;
+    txt(ctx, 'COTE TOTALE', px, 330, 36, env.F.xb, acc);
+    ctx.fillStyle = acc; ctx.fillRect(px - 70 * b, 356, 140 * b, 5);
+    const z = done ? 1 + 0.1 * (1 - prog(lt, t1 + 0.1, 0.35)) : 1;
+    ctx.save(); ctx.translate(px, 560); ctx.scale(z, z); ctx.shadowColor = rgba(acc, 0.6); ctx.shadowBlur = 50;
+    fitTxt(ctx, val >= 100 ? money(val) : fr(val), 0, 60, 190, 90, 700, env.F.display, '#FFFFFF');
+    ctx.shadowBlur = 0; ctx.restore();
+    if (L.stake) {
+      txt(ctx, 'Mise ' + money(L.stake) + ' FCFA', px, 720, 36, env.F.sb, MUTE_L);
+      txt(ctx, 'Gain potentiel', px, 800, 30, env.F.sb, MUTE_L);
+      fitTxt(ctx, money(L.stake * val) + ' FCFA', px, 870, 56, 30, 700, env.F.black, done ? GREEN : '#FFFFFF');
+    }
+    if (L.code && done) {
+      const c = clamp(easeBack(prog(lt, t1 + 0.3, 0.4)), 0, 1);
+      ctx.save(); ctx.globalAlpha *= c;
+      ctx.fillStyle = rgba(acc, 0.16); rr(ctx, px - 230, 915, 460, 70, 18); ctx.fill();
+      ctx.strokeStyle = acc; ctx.lineWidth = 3; rr(ctx, px - 230, 915, 460, 70, 18); ctx.stroke();
+      txt(ctx, 'CODE  ' + L.code, px, 963, 36, env.F.xb, '#FFFFFF');
+      ctx.restore();
+    }
+    ctx.restore();
+    return { subs: false };
+  },
+
+  // Grille de marchés : les tuiles apparaissent une à une, celles « on » s'allument.
+  markets(ctx, env, s, lt, t) {
+    const L = s.look; bgMesh(ctx, s, t);
+    const acc = hue(s)[0], items = L.items || [], cols = L.cols || 4;
+    const nr = Math.ceil(items.length / cols), tw = 380, th = 150, gx = 36, gy = 34;
+    const gw = cols * tw + (cols - 1) * gx, gh = nr * th + (nr - 1) * gy;
+    const x0 = (W - gw) / 2, y0 = (H - gh) / 2 + 20;
+    if (L.kicker) {
+      const a = easeOut(prog(lt, 0, 0.5));
+      ctx.save(); ctx.globalAlpha *= a; txt(ctx, L.kicker, W / 2, y0 - 80, 34, env.F.xb, acc);
+      ctx.fillStyle = acc; ctx.fillRect(W / 2 - 70 * a, y0 - 58, 140 * a, 5); ctx.restore();
+    }
+    const st = Math.min(0.28, (s.voiceDur * 0.55) / Math.max(1, items.length));
+    const onAt = T(s, L.on_at == null ? 0.6 : L.on_at);
+    items.forEach((it, i) => {
+      const x = x0 + (i % cols) * (tw + gx), y = y0 + Math.floor(i / cols) * (th + gy);
+      const a = easeBack(prog(lt, T(s, 0.05) + i * st, 0.4));
+      if (a <= 0) return;
+      const hl = it.on ? easeOut(prog(lt, onAt, 0.4)) : 0;
+      ctx.save(); ctx.translate(x + tw / 2, y + th / 2);
+      const z = Math.max(0.01, a) * (1 + 0.05 * hl); ctx.scale(z, z); ctx.globalAlpha *= clamp(a, 0, 1) * (lt > onAt && !it.on && items.some((q) => q.on) ? 0.55 : 1);
+      ctx.fillStyle = hl > 0 ? rgba(acc, 0.12 + 0.16 * hl) : 'rgba(255,255,255,0.06)'; rr(ctx, -tw / 2, -th / 2, tw, th, 22); ctx.fill();
+      ctx.strokeStyle = hl > 0 ? rgba(acc, 0.35 + 0.6 * hl) : 'rgba(255,255,255,0.12)'; ctx.lineWidth = 3; rr(ctx, -tw / 2, -th / 2, tw, th, 22); ctx.stroke();
+      fitTxt(ctx, String(it.label).toUpperCase(), 0, it.sub ? -4 : 14, 40, 22, tw - 50, env.F.xb, '#FFFFFF');
+      if (it.sub) fitTxt(ctx, it.sub, 0, 42, 24, 16, tw - 50, env.F.sb, MUTE_L);
+      ctx.restore();
+    });
+    return { subs: true };
+  },
+
   bigstat(ctx, env, s, lt, t) {
     const L = s.look; bgMesh(ctx, s, t);
     const acc = hue(s)[0], t0 = T(s, 0.02), d = 1.2;
@@ -644,6 +733,8 @@ export function lookSfx(s) {
   if (L.type === 'prob') out.push(['whoosh', 0, 0.3], ['pop', T(s, L.focus === 'rest' ? 0.05 : 0.35), 0.4]);
   if (L.type === 'odds') (L.at || [0.3, 0.65]).forEach((f) => out.push(['whoosh', T(s, f), 0.35], ['pop', T(s, f) + 0.9, 0.35]));
   if (L.type === 'split') { const at = L.at || []; out.push(['whoosh', T(s, at[0] || 0), 0.3]); [1, 2, 3, 4].forEach((i) => at[i] != null && out.push(['pop', T(s, at[i]), 0.35])); if (at[5] != null) out.push(['ding', T(s, at[5]), 0.5]); }
+  if (L.type === 'stack') { const n = (L.rows || []).length, t0 = T(s, 0.04), t1 = T(s, L.end == null ? 0.85 : L.end), st = n ? Math.max(0.05, (t1 - t0) / n) : 1; out.push(['whoosh', 0, 0.35]); for (let i = 0; i < n; i++) out.push(['pop', t0 + i * st, 0.16]); out.push(['ding', t1 + 0.1, 0.55]); }
+  if (L.type === 'markets') { out.push(['whoosh', 0, 0.3]); const n = (L.items || []).length, st = Math.min(0.28, (s.voiceDur * 0.55) / Math.max(1, n)); for (let i = 0; i < n; i += 2) out.push(['pop', T(s, 0.05) + i * st, 0.25]); if ((L.items || []).some((x) => x.on)) out.push(['ding', T(s, L.on_at == null ? 0.6 : L.on_at), 0.45]); }
   if (L.type === 'bigstat') out.push(['rise', 0, 0.3], ['ding', T(s, 0.02) + 1.2, 0.55]);
   if (L.type === 'books') { out.push(['whoosh', 0, 0.3]); const n = (L.logos || []).length, st = booksStep(s, n); for (let i = 0; i < n; i += 2) out.push(['pop', T(s, 0.06) + i * st, 0.28]); }
   if (L.type === 'mail') out.push(['whoosh', T(s, 0.05), 0.35], ['ding', T(s, 0.05) + 0.5, 0.35], ['keys', T(s, 0.45), 0.35], ['ding', T(s, 0.8), 0.5]);
