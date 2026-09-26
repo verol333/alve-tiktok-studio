@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { run } from './sh.mjs';
+import { run, duration } from './sh.mjs';
 import { download } from './api.mjs';
 import { comboRevealAt } from './scenes.mjs';
 
@@ -24,8 +24,29 @@ export async function makeSfx(dir, total) {
   await gen('music.wav', "aevalsrc='" + pad + '*' + soft + '+' + kick + '+' + hat + "':d=" + (total + 1).toFixed(2) + ':s=44100', ['-af', 'lowpass=f=8000']);
 }
 
+// Voix resserrée : blancs de début et de fin retirés, pauses internes de plus
+// de 0,35 s ramenées à 0,2 s. En cas d'échec, la voix d'origine est gardée.
+export async function tightVoice(src, out) {
+  const edge = (keep) => 'silenceremove=start_periods=1:start_threshold=-42dB:start_silence=' + keep;
+  const af = [edge(0.03), 'areverse', edge(0.06), 'areverse',
+    'silenceremove=stop_periods=-1:stop_duration=0.35:stop_threshold=-42dB:stop_silence=0.2'].join(',');
+  try {
+    await run('ffmpeg', ['-y', '-i', src, '-af', af, '-ar', '44100', '-ac', '1', out]);
+    const a = await duration(src), b = await duration(out);
+    if (!(b > 0.4) || b < a * 0.5) return src;
+    console.log('Voix resserrée : ' + a.toFixed(2) + ' s -> ' + b.toFixed(2) + ' s');
+    return out;
+  } catch (e) { console.error('Resserrage de la voix impossible : ' + String(e.message || e).slice(-200)); return src; }
+}
+
 export function sfxEvents(tl, env) {
   const ev = [];
+  // « Pop » discret à l'instant exact où un chiffre est prononcé (sous-titres calés).
+  tl.scenes.forEach((s) => {
+    if (!s.aligned || s.kind === 'hook') return;
+    s.words.filter((w) => /\d/.test(w.text)).slice(0, 3)
+      .forEach((w) => ev.push({ name: 'pop', at: s.voiceAt + w.start * s.voiceDur, vol: 0.3 }));
+  });
   tl.scenes.forEach((s) => {
     if (s.index > 0) ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.55 });
     if (s.kind === 'hook') ev.push({ name: 'impact', at: 0.2, vol: 0.8 });
