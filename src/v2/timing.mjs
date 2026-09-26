@@ -11,4 +11,9 @@ export const scoreT = (sc) => wordT(sc, (x) => /\d+-\d+/.test(x), 1.3);
 export const rowT = (k) => 0.55 + 0.42 * k;
 export const totalT = (sc, env) => Math.max(rowT(env.picks.length) + 0.25, wordT(sc, (x) => num(x).includes(env.totalOdds.toFixed(2)), 0) - 0.1);
 export const subT = (sc) => wordT(sc, (x) => /abonne/i.test(x), Math.max(0.6, sc.dur - 2));
-export const resultT = (sc, k, n) => 0.45 + k * Math.max(0.55, (sc.voiceDur * 0.7) / Math.max(1, n));
+const nw = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+export const resultT = (sc, k, n, team) => {
+  const fb = 0.45 + k * Math.max(0.55, (sc.voiceDur * 0.7) / Math.max(1, n));
+  const key = nw(String(team || '').split(/[\s-]+/)[0]);
+  return key ? Math.max(0.3, wordT(sc, (x) => nw(x) === key, fb) - 0.15) : fb;
+};
