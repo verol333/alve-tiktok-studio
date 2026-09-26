@@ -7,7 +7,8 @@ import { buildTimeline } from './timeline.mjs';
 import { PALETTES, makeParticles } from './hud.mjs';
 import { renderVideo } from './render.mjs';
 import { buildEnv } from './env.mjs';
-import { makeSfx, mixAudio, sfxEvents } from './audio.mjs';
+import { makeSfx, mixAudio, sfxEvents, tightVoice } from './audio.mjs';
+import { alignScenes } from './align.mjs';
 import { cloneVoices } from './clone.mjs';
 
 const DIR = '/tmp/studio';
@@ -70,14 +71,16 @@ async function main() {
   for (const [i, s] of job.scenes.entries()) {
     let f = cloned && cloned[i], d = f ? await duration(f).catch(() => 0) : 0;
     if (!(d > 0.4)) {
-      f = join(DIR, 'v' + i + '.mp3');
-      await download(s.audio_url, f);
+      const raw = join(DIR, 'v' + i + '.mp3');
+      await download(s.audio_url, raw);
+      f = await tightVoice(raw, join(DIR, 'vt' + i + '.wav'));
       d = await duration(f);
     }
     if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
     voiceFiles.push(f); durs.push(d);
   }
   const tl = buildTimeline(job.scenes, durs);
+  await alignScenes(tl, voiceFiles, DIR);
   // YouTube Shorts : jusqu'à 3 min ; Facebook reçoit sa version coupée à 90 s.
   if (tl.total < 12 || tl.total > 180) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
   const env = await buildEnv(job, tl, DIR);
