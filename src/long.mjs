@@ -546,7 +546,7 @@ export async function buildEnv(spec, DIR) {
 export async function renderSegment(env, tl, f0, f1, out) {
   const canvas = createCanvas(SW, SH), ctx = canvas.getContext('2d');
   const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', SW + 'x' + SH, '-r', String(FPS), '-i', '-',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-maxrate', '4500k', '-bufsize', '9000k', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
   let errTail = '';
   ff.stderr.on('data', (d) => { errTail = (errTail + d).slice(-2000); });
   ff.stdin.on('error', () => {});
