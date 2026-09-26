@@ -161,15 +161,15 @@ export function kinetic(ctx, env, sc, t, o) {
       const at = wordAt(sc, it.i) - 0.05, p = prog(t, at, arena ? 0.16 : 0.22);
       if (p <= 0) return;
       const e = easeOut(p), hi = isHi(sc.words[it.i].text, sc.highlight), cx = x0 + it.x + it.ww / 2, my = y - z * 0.36;
-      const s = arena ? 2.1 - 1.1 * e : 1 + 0.45 * (1 - e);
+      const s = arena ? 1.3 - 0.3 * e : 1 + 0.45 * (1 - e);
       ctx.save(); ctx.globalAlpha = clamp(p * 1.6, 0, 1);
       ctx.translate(cx, my + (arena ? 0 : 36 * (1 - e))); ctx.scale(s, s); ctx.translate(-cx, -my);
       font(ctx, z, F.display); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
       if (arena) {
         if (p < 1) {
-          ctx.globalAlpha = 0.7 * (1 - p);
-          ctx.fillStyle = '#FF2E63'; ctx.fillText(it.s, cx - 14 * (1 - p), y);
-          ctx.fillStyle = '#08F7FE'; ctx.fillText(it.s, cx + 14 * (1 - p), y);
+          ctx.globalAlpha = 0.4 * (1 - p);
+          ctx.fillStyle = '#FF2E63'; ctx.fillText(it.s, cx - 6 * (1 - p), y);
+          ctx.fillStyle = '#08F7FE'; ctx.fillText(it.s, cx + 6 * (1 - p), y);
           ctx.globalAlpha = clamp(p * 1.6, 0, 1);
         }
         ctx.lineJoin = 'round'; ctx.lineWidth = z * 0.09; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(it.s, cx, y);
