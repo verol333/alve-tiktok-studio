@@ -2,8 +2,9 @@
 export function buildTimeline(scenes, durs) {
   let t = 0; const out = [];
   scenes.forEach((s, i) => {
-    const lead = i === 0 ? 0.12 : 0.18;
-    const tail = s.kind === 'outro' ? 1.6 : 0.28;
+    // Enchaînement serré : pas de blanc entre deux phrases.
+    const lead = i === 0 ? 0.08 : 0.06;
+    const tail = s.kind === 'outro' ? 1.2 : 0.1;
     const dur = lead + durs[i] + tail;
     const words = String(s.text || '').split(/[ \t\n\r]+/).filter(Boolean);
     const weights = words.map((w) => w.length + 3);
