@@ -228,3 +228,10 @@ export function subs(ctx, env, sc, t, y, mode) {
   });
   ctx.restore();
 }
+
+// Vrai logo du site (image envoyée par l'appli), centré en (cx, cy). false si absent.
+export function brand(ctx, env, cx, cy, size) {
+  const L = env.logo; if (!L || !(size > 1)) return false;
+  const k = size / Math.max(L.width, L.height), w = L.width * k, h = L.height * k;
+  ctx.drawImage(L, cx - w / 2, cy - h / 2, w, h); return true;
+}
