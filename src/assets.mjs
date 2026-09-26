@@ -35,6 +35,26 @@ export async function loadFonts(dir) {
   return F;
 }
 
+// Polices « affiche » : une différente à chaque vidéo (identité du jour).
+const LOOK_FONTS = {
+  anton: 'ofl/anton/Anton-Regular.ttf', bebas: 'ofl/bebasneue/BebasNeue-Regular.ttf', archivo: 'ofl/archivoblack/ArchivoBlack-Regular.ttf',
+  bungee: 'ofl/bungee/Bungee-Regular.ttf', russo: 'ofl/russoone/RussoOne-Regular.ttf', righteous: 'ofl/righteous/Righteous-Regular.ttf',
+  marker: 'apache/permanentmarker/PermanentMarker-Regular.ttf', bangers: 'ofl/bangers/Bangers-Regular.ttf', titan: 'ofl/titanone/TitanOne-Regular.ttf',
+  staatliches: 'ofl/staatliches/Staatliches-Regular.ttf', blackops: 'ofl/blackopsone/BlackOpsOne-Regular.ttf', bowlby: 'ofl/bowlbyone/BowlbyOne-Regular.ttf',
+  alfaslab: 'ofl/alfaslabone/AlfaSlabOne-Regular.ttf', abril: 'ofl/abrilfatface/AbrilFatface-Regular.ttf', rubikmono: 'ofl/rubikmonoone/RubikMonoOne-Regular.ttf',
+  luckiest: 'apache/luckiestguy/LuckiestGuy-Regular.ttf',
+};
+export async function loadLookFont(dir, key) {
+  const path = LOOK_FONTS[key];
+  if (!path) return null;
+  const buf = await get('https://raw.githubusercontent.com/google/fonts/main/' + path);
+  if (!buf) return null;
+  const name = 'Look_' + key, f = join(dir, name + '.ttf');
+  writeFileSync(f, buf);
+  GlobalFonts.registerFromPath(f, name);
+  return name;
+}
+
 export async function loadImg(url) {
   if (!url) return null;
   const buf = await get(url);

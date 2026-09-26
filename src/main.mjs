@@ -83,7 +83,7 @@ async function main() {
   await alignScenes(tl, voiceFiles, DIR);
   // YouTube Shorts : jusqu'à 3 min ; Facebook reçoit sa version coupée à 90 s.
   if (tl.total < 12 || tl.total > 180) throw new Error('Durée anormale : ' + tl.total.toFixed(1) + ' s');
-  if (style.theme) { const { downloadClips } = await import('./v2/index.mjs'); await downloadClips(job.scenes, DIR); }
+  if (style.theme) { const { downloadClips } = await import('./v2/index.mjs'); await downloadClips(job.scenes, DIR, (style.look || {}).seed); }
   const env = await buildEnv(job, tl, DIR);
   console.log('Logos chargés : ' + env.logos.map((l) => (l.home ? 1 : 0) + (l.away ? 1 : 0)).join(',') + ' — durée ' + tl.total.toFixed(1) + ' s');
 

@@ -136,10 +136,10 @@ const show = (w) => (/alvecapital\.fr/i.test(w) ? w.toLowerCase() : w.toUpperCas
 export function kinetic(ctx, env, sc, t, o) {
   const words = sc.words.map((w) => show(w.text));
   if (!words.length) return;
-  const F = env.F;
+  const F = env.F, fam = F.kin || F.display, L = env.look;
   let z = o.size, rows;
   for (;;) {
-    font(ctx, z, F.display);
+    font(ctx, z, fam);
     const sp = ctx.measureText(' ').width;
     rows = []; let cur = [], w = 0;
     words.forEach((s, i) => {
@@ -155,41 +155,62 @@ export function kinetic(ctx, env, sc, t, o) {
   }
   const lh = z * 1.04, y0 = o.cy - ((rows.length - 1) * lh) / 2 + z * 0.36;
   const arena = o.mode === 'arena';
+  // Animation d'entrée et surlignage : ceux de l'identité du jour, sinon ceux du style.
+  const fx = (L && L.text_fx) || (arena ? 'glitch' : 'rise');
+  const hl = (L && L.highlight) || (arena ? 'fire' : 'marker');
+  const D = fx === 'type' ? 0.3 : fx === 'glitch' || fx === 'stamp' ? 0.16 : 0.22;
+  const FIRE = env.fire || ['#FFF3B0', '#FFB020', '#FF4D00'], HOT = (L && L.hot) || '#FFFFFF';
   rows.forEach((row, r) => {
     const y = y0 + r * lh, x0 = 540 - row.w / 2;
     row.items.forEach((it) => {
-      const at = wordAt(sc, it.i) - 0.05, p = prog(t, at, arena ? 0.16 : 0.22);
+      const at = wordAt(sc, it.i) - 0.05, p = prog(t, at, D);
       if (p <= 0) return;
-      const e = easeOut(p), hi = isHi(sc.words[it.i].text, sc.highlight), cx = x0 + it.x + it.ww / 2, my = y - z * 0.36;
-      const s = arena ? 1.3 - 0.3 * e : 1 + 0.45 * (1 - e);
-      ctx.save(); ctx.globalAlpha = clamp(p * 1.6, 0, 1);
-      ctx.translate(cx, my + (arena ? 0 : 36 * (1 - e))); ctx.scale(s, s); ctx.translate(-cx, -my);
-      font(ctx, z, F.display); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-      if (arena) {
-        if (p < 1) {
-          ctx.globalAlpha = 0.4 * (1 - p);
-          ctx.fillStyle = '#FF2E63'; ctx.fillText(it.s, cx - 6 * (1 - p), y);
-          ctx.fillStyle = '#08F7FE'; ctx.fillText(it.s, cx + 6 * (1 - p), y);
-          ctx.globalAlpha = clamp(p * 1.6, 0, 1);
-        }
-        ctx.lineJoin = 'round'; ctx.lineWidth = z * 0.09; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(it.s, cx, y);
-        if (hi) {
-          const g = ctx.createLinearGradient(0, y - z * 0.8, 0, y);
-          g.addColorStop(0, '#FFF3B0'); g.addColorStop(0.5, '#FFB020'); g.addColorStop(1, '#FF4D00');
-          ctx.shadowColor = 'rgba(255,120,0,0.9)'; ctx.shadowBlur = 40; ctx.fillStyle = g;
-        } else ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(it.s, cx, y);
-      } else {
-        if (hi) {
-          const q = inOut(prog(t, at + 0.06, 0.22));
-          ctx.save(); ctx.translate(x0 + it.x - 14, y - z * 0.82); ctx.transform(1, 0, -0.18, 1, 0, 0);
-          ctx.fillStyle = env.accent; ctx.fillRect(0, 0, (it.ww + 28) * q, z * 0.98); ctx.restore();
-          ctx.fillStyle = q > 0.5 ? '#0B1020' : '#FFFFFF';
-        } else {
-          ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 26; ctx.fillStyle = '#FFFFFF';
-        }
-        ctx.fillText(it.s, cx, y);
+      const e = easeOut(p), b = easeBack(p), hi = isHi(sc.words[it.i].text, sc.highlight), cx = x0 + it.x + it.ww / 2, my = y - z * 0.36;
+      let dx = 0, dy = 0, s = 1, rot = 0;
+      if (fx === 'rise') { dy = 36 * (1 - e); s = 1 + 0.45 * (1 - e); }
+      else if (fx === 'pop') s = Math.max(0.05, b);
+      else if (fx === 'drop') dy = -160 * (1 - b);
+      else if (fx === 'slide') dx = -90 * (1 - e);
+      else if (fx === 'stamp') s = 1.8 - 0.8 * e;
+      else if (fx === 'glitch') s = 1.3 - 0.3 * e;
+      else if (fx === 'spin') { rot = -0.35 * (1 - e); s = Math.max(0.05, 0.6 + 0.4 * b); }
+      else if (fx === 'wave') dy = 30 * (1 - e) + Math.sin(t * 4 + it.i * 0.8) * 7;
+      const alpha = fx === 'type' ? 1 : clamp(p * 1.6, 0, 1);
+      ctx.save(); ctx.globalAlpha = alpha;
+      ctx.translate(cx + dx, my + dy); ctx.rotate(rot); ctx.scale(s, s); ctx.translate(-cx, -my);
+      if (fx === 'type') { ctx.beginPath(); ctx.rect(x0 + it.x - 20, y - z * 1.1, (it.ww + 40) * p, z * 1.5); ctx.clip(); }
+      font(ctx, z, fam); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      if (fx === 'glitch' && p < 1) {
+        ctx.globalAlpha = 0.4 * (1 - p);
+        ctx.fillStyle = '#FF2E63'; ctx.fillText(it.s, cx - 6 * (1 - p), y);
+        ctx.fillStyle = '#08F7FE'; ctx.fillText(it.s, cx + 6 * (1 - p), y);
+        ctx.globalAlpha = alpha;
       }
+      if (arena || hl === 'fire' || hl === 'outline') { ctx.lineJoin = 'round'; ctx.lineWidth = z * 0.09; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(it.s, cx, y); }
+      else { ctx.shadowColor = 'rgba(0,0,0,0.65)'; ctx.shadowBlur = 26; }
+      let fill = '#FFFFFF';
+      if (hi) {
+        const q = inOut(prog(t, at + 0.06, 0.22));
+        if (hl === 'marker' || hl === 'box') {
+          ctx.save(); ctx.shadowBlur = 0; ctx.fillStyle = env.accent;
+          if (hl === 'marker') { ctx.translate(x0 + it.x - 14, y - z * 0.82); ctx.transform(1, 0, -0.18, 1, 0, 0); ctx.fillRect(0, 0, (it.ww + 28) * q, z * 0.98); }
+          else { rr(ctx, x0 + it.x - 16, y - z * 0.84, Math.max(1, (it.ww + 32) * q), z * 1.02, z * 0.16); ctx.fill(); }
+          ctx.restore();
+          fill = q > 0.5 ? '#0B1020' : '#FFFFFF';
+        } else if (hl === 'fire') {
+          const g = ctx.createLinearGradient(0, y - z * 0.8, 0, y);
+          g.addColorStop(0, FIRE[0]); g.addColorStop(0.5, FIRE[1]); g.addColorStop(1, FIRE[2]);
+          ctx.shadowColor = FIRE[1]; ctx.shadowBlur = 40; fill = g;
+        } else if (hl === 'glow') { ctx.shadowColor = env.accent; ctx.shadowBlur = 50; fill = env.accent; }
+        else if (hl === 'underline') {
+          ctx.save(); ctx.shadowBlur = 0; ctx.fillStyle = env.accent; ctx.fillRect(x0 + it.x, y + z * 0.08, it.ww * q, z * 0.11); ctx.restore(); fill = HOT;
+        } else if (hl === 'outline') { ctx.lineWidth = z * 0.05; ctx.strokeStyle = env.accent; ctx.strokeText(it.s, cx, y); fill = 'rgba(255,255,255,0.12)'; }
+        else if (hl === 'circle') {
+          ctx.save(); ctx.shadowBlur = 0; ctx.strokeStyle = env.accent; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath();
+          ctx.ellipse(cx, my, it.ww / 2 + 30, z * 0.62, -0.06, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.01, q)); ctx.stroke(); ctx.restore(); fill = HOT;
+        }
+      }
+      ctx.fillStyle = fill; ctx.fillText(it.s, cx, y);
       ctx.restore();
     });
   });

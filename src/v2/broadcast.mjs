@@ -3,6 +3,7 @@
 import { W, H, clamp, prog, easeOut, easeBack, rgba, rr, font, inOut, lerp, idx, mix, lum, txt, fit, lines, disc, check, subscribe, kinetic, subs, brand } from './kit.mjs';
 import { COLLIDE, coteT, confT, scoreT, rowT, totalT, subT, resultT } from './timing.mjs';
 import { bgFrame } from './bg.mjs';
+import { overlay, frame, transition } from './look.mjs';
 
 const NAVY = '#0A1330', CARD = 'rgba(8,14,34,0.9)';
 const hhmm = (iso) => { try { return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Brazzaville' }).format(new Date(iso)); } catch (e) { return ''; } };
@@ -333,6 +334,8 @@ export async function drawBroadcast(ctx, env, sc, t) {
   (SCENES[sc.kind] || kin)(ctx, env, sc, t, lt);
   ctx.restore();
   if (data) subs(ctx, env, sc, t, 1510, 'box');
+  overlay(ctx, env, t);
+  frame(ctx, env, t);
   chrome(ctx, env, t);
-  stinger(ctx, env, t);
+  if (!transition(ctx, env, t)) stinger(ctx, env, t);
 }

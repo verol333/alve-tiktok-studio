@@ -3,13 +3,18 @@
 import { W, H, clamp, prog, easeOut, easeBack, rr, font, seeded, lerp, idx, mix, txt, fit, lines, disc, check, subscribe, kinetic, subs, brand } from './kit.mjs';
 import { COLLIDE, coteT, confT, scoreT, rowT, totalT, subT, resultT } from './timing.mjs';
 import { bgFrame } from './bg.mjs';
+import { overlay, frame, transition } from './look.mjs';
+
+// Couleurs « feu » : celles de l'identité du jour quand elle existe.
+const FIRE0 = ['#FFF3B0', '#FFB020', '#FF4D00'];
+let FIRE = FIRE0;
 
 const hhmm = (iso) => { try { return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Brazzaville' }).format(new Date(iso)); } catch (e) { return ''; } };
 const seamY = (x) => 1000 - x * 0.09;
 const CY = 950;
 function fire(ctx, y0, y1) {
   const g = ctx.createLinearGradient(0, y0, 0, y1);
-  g.addColorStop(0, '#FFF3B0'); g.addColorStop(0.5, '#FFB020'); g.addColorStop(1, '#FF4D00');
+  g.addColorStop(0, FIRE[0]); g.addColorStop(0.5, FIRE[1]); g.addColorStop(1, FIRE[2]);
   return g;
 }
 // Gros titre en lettres de feu.
@@ -182,7 +187,7 @@ function pick(ctx, env, sc, t, lt) {
     txt(ctx, Math.round(conf * mp) + '%', 970, 1242, 66, F.display, '#FFFFFF', 'right', 8);
     for (let k = 0; k < 20; k++) {
       rr(ctx, 110 + k * 43, 1265, 36, 70, 6);
-      ctx.fillStyle = k < on ? mix('#22C55E', '#FFB020', k / 20) : 'rgba(255,255,255,0.12)'; ctx.fill();
+      ctx.fillStyle = k < on ? mix('#22C55E', FIRE[1], k / 20) : 'rgba(255,255,255,0.12)'; ctx.fill();
     }
   }
 }
@@ -201,7 +206,7 @@ function combo(ctx, env, sc, t, lt) {
     const lab = String(p.label || ''), tm = p.team_home + ' - ' + p.team_away;
     txt(ctx, lab, 270, y + 68, fit(ctx, lab, F.xb, 36, 20, 540), F.xb, '#FFFFFF', 'left');
     txt(ctx, tm, 270, y + 110, fit(ctx, tm, F.sb, 24, 16, 540), F.sb, 'rgba(255,255,255,0.6)', 'left');
-    txt(ctx, Number(p.cote).toFixed(2), 1000, y + 100, 76, F.display, '#FFB020', 'right');
+    txt(ctx, Number(p.cote).toFixed(2), 1000, y + 100, 76, F.display, FIRE[1], 'right');
     ctx.restore();
   });
   const tAt = totalT(sc, env), tp = prog(lt, tAt, 0.22), by = 490 + (n - 1) * 175 + 200;
@@ -226,7 +231,7 @@ function results(ctx, env, sc, t, lt) {
     const tm = w.team_home + ' - ' + w.team_away;
     txt(ctx, tm, 270, y + 68, fit(ctx, tm, F.xb, 32, 18, 440), F.xb, '#FFFFFF', 'left');
     txt(ctx, w.label, 270, y + 110, fit(ctx, w.label, F.sb, 24, 16, 440), F.sb, 'rgba(255,255,255,0.7)', 'left');
-    txt(ctx, String(w.final_score).replace(/\s*[-:]\s*/, ' - '), 270, y + 175, 56, F.display, '#FFB020', 'left');
+    txt(ctx, String(w.final_score).replace(/\s*[-:]\s*/, ' - '), 270, y + 175, 56, F.display, FIRE[1], 'left');
     ctx.restore();
     const s = prog(lt, at + 0.25, 0.2);
     if (s > 0) {
@@ -239,12 +244,12 @@ function results(ctx, env, sc, t, lt) {
 
 function site(ctx, env, sc, t, lt) {
   const F = env.F;
-  { const e = easeBack(prog(lt, 0, 0.4)); ctx.save(); ctx.shadowColor = '#FFB020'; ctx.shadowBlur = 60; brand(ctx, env, 540, 470, 260 * e); ctx.restore(); }
+  { const e = easeBack(prog(lt, 0, 0.4)); ctx.save(); ctx.shadowColor = FIRE[1]; ctx.shadowBlur = 60; brand(ctx, env, 540, 470, 260 * e); ctx.restore(); }
   txt(ctx, 'RENDEZ-VOUS SUR', 540, 720, 90, F.display, '#FFFFFF', 'center', 10);
   const on = lt > 0.4 && !(lt > 0.5 && lt < 0.58) && !(lt > 0.7 && lt < 0.74);
   if (on) {
     const z = fit(ctx, 'alvecapital.fr', F.black, 110, 60, 960);
-    ctx.save(); ctx.shadowColor = '#FFB020'; ctx.shadowBlur = 50;
+    ctx.save(); ctx.shadowColor = FIRE[1]; ctx.shadowBlur = 50;
     txt(ctx, 'alvecapital.fr', 540, 920, z, F.black, '#FFF6E0'); txt(ctx, 'alvecapital.fr', 540, 920, z, F.black, '#FFF6E0');
     ctx.restore();
   }
@@ -280,7 +285,7 @@ function shake(env, sc, lt) {
 function chrome(ctx, env, t) {
   const F = env.F;
   ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, 0, W, 6);
-  const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, '#FF4D00'); g.addColorStop(1, '#FFF3B0');
+  const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, FIRE[2]); g.addColorStop(1, FIRE[0]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W * clamp(t / env.total, 0, 1), 6);
   const lx = brand(ctx, env, 96, 118, 96) ? 158 : 48;
   txt(ctx, 'AL VE CAPITAL', lx, 120, 52, F.display, '#FFFFFF', 'left', 8);
@@ -299,6 +304,7 @@ function flash(ctx, env, t) {
 
 export async function drawArena(ctx, env, sc, t) {
   const lt = t - sc.start;
+  FIRE = env.fire || FIRE0;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
   background(ctx, env, sc, t, await bgFrame(env, sc, t));
@@ -307,6 +313,8 @@ export async function drawArena(ctx, env, sc, t) {
   (SCENES[sc.kind] || kin)(ctx, env, sc, t, lt);
   ctx.restore();
   if (SUBS.has(sc.kind)) subs(ctx, env, sc, t, 1590, 'fire');
+  overlay(ctx, env, t);
+  frame(ctx, env, t);
   chrome(ctx, env, t);
-  flash(ctx, env, t);
+  if (!transition(ctx, env, t)) flash(ctx, env, t);
 }

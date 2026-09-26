@@ -15,17 +15,21 @@ export const CLIPS = {
   crowd: 'a5fd76ce0_mixkit-9585.mp4', friends: 'ec4009989_mixkit-44602.mp4',
 };
 const BY_KIND = {
-  hook: ['night', 'lowpitch', 'inside'], results: ['friends', 'crowd'], match: ['duel', 'play', 'dribble', 'goal'],
-  pick: ['penalty', 'grass', 'lowpitch'], retention: ['night', 'aerial'], combo: ['inside', 'aerial'],
-  teaser: ['fans', 'yellow'], site: ['yellow', 'fans'], outro: ['crowd', 'friends'],
+  hook: ['night', 'lowpitch', 'inside', 'aerial', 'crowd'], results: ['friends', 'crowd', 'fans'], match: ['duel', 'play', 'dribble', 'goal', 'penalty'],
+  pick: ['penalty', 'grass', 'lowpitch', 'goal', 'dribble'], retention: ['night', 'aerial', 'yellow'], combo: ['inside', 'aerial', 'crowd', 'fans'],
+  teaser: ['fans', 'yellow', 'friends'], site: ['yellow', 'fans', 'crowd'], outro: ['crowd', 'friends', 'fans'],
 };
+// Graine de la vidéo : chaque montage pioche d'autres plans, pris à d'autres instants.
+let SEED = 0;
+export function setBgSeed(s) { SEED = (Number(s) || 0) >>> 0; }
 export function clipKey(sc) {
   const list = BY_KIND[sc.kind] || BY_KIND.hook;
-  return list[(sc.index + Math.max(0, Math.round(Number(sc.match_index) || 0))) % list.length];
+  return list[(sc.index + Math.max(0, Math.round(Number(sc.match_index) || 0)) + SEED) % list.length];
 }
 const file = (DIR, k) => join(DIR, 'bg_' + k + '.mp4');
 
-export async function downloadClips(scenes, DIR) {
+export async function downloadClips(scenes, DIR, seed) {
+  if (seed != null) setBgSeed(seed);
   const keys = [...new Set(scenes.map((s, i) => clipKey(Object.assign({}, s, { index: i }))))];
   for (const k of keys) {
     if (existsSync(file(DIR, k))) continue;
@@ -78,7 +82,7 @@ export async function bgFrame(env, sc, t) {
   if (st.idx !== sc.index) {
     if (st.s) st.s.close();
     st.idx = sc.index;
-    const start = (1 + ((sc.index * 2.3) % 4) + (t - sc.start)) % Math.max(1, dur - 0.5);
+    const start = (1 + ((sc.index * 2.3 + (SEED % 7) * 0.9) % 6) + (t - sc.start)) % Math.max(1, dur - 0.5);
     st.s = new BgStream(file(env.DIR, k), start, env.bgVf);
   }
   return st.s.next();
