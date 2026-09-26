@@ -1,6 +1,6 @@
 // Style « Télé » : habillage d'avant-match façon chaîne sportive, sur de vrais
 // plans de stade. Plaques aux couleurs des clubs, tableau de score, ticket.
-import { W, H, clamp, prog, easeOut, easeBack, rgba, rr, font, inOut, lerp, idx, mix, lum, txt, fit, lines, disc, check, subscribe, kinetic, subs } from './kit.mjs';
+import { W, H, clamp, prog, easeOut, easeBack, rgba, rr, font, inOut, lerp, idx, mix, lum, txt, fit, lines, disc, check, subscribe, kinetic, subs, brand } from './kit.mjs';
 import { COLLIDE, coteT, confT, scoreT, rowT, totalT, subT, resultT } from './timing.mjs';
 import { bgFrame } from './bg.mjs';
 
@@ -225,7 +225,7 @@ function results(ctx, env, sc, t, lt) {
   const F = env.F, pr = env.proof || {}, wins = (pr.wins || []).slice(0, 3), n = wins.length;
   header(ctx, env, pr.ours ? "NOS PRONOS D'HIER" : 'RÉSULTATS VALIDÉS', pr.ours ? n + ' SUR ' + n : (pr.won ? pr.won + ' VALIDÉS' : ''), 330, lt);
   wins.forEach((w, k) => {
-    const at = resultT(sc, k, n), p = easeOut(prog(lt, at, 0.35));
+    const at = resultT(sc, k, n, w.team_home), p = easeOut(prog(lt, at, 0.35));
     if (p <= 0) return;
     const y = 460 + k * 250, L = env.proofLogos[k] || {};
     ctx.save(); ctx.globalAlpha = p; ctx.translate((k % 2 ? 1 : -1) * 200 * (1 - p), 0);
@@ -243,6 +243,7 @@ function results(ctx, env, sc, t, lt) {
 
 function site(ctx, env, sc, t, lt) {
   const F = env.F, a = easeOut(prog(lt, 0, 0.4));
+  ctx.save(); ctx.globalAlpha = a; ctx.shadowColor = rgba(env.accent, 0.55); ctx.shadowBlur = 60; brand(ctx, env, 540, 470, 250 + 12 * Math.sin(lt * 3)); ctx.restore();
   ctx.save(); ctx.globalAlpha = a; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 24;
   txt(ctx, 'RENDEZ-VOUS SUR', 540, 700, 84, F.display, '#FFFFFF'); ctx.restore();
   const b = easeBack(prog(lt, 0.2, 0.45));
@@ -250,8 +251,8 @@ function site(ctx, env, sc, t, lt) {
     ctx.save(); ctx.translate(540, 860); ctx.scale(b, b);
     ctx.shadowColor = rgba(env.accent, 0.6); ctx.shadowBlur = 50;
     rr(ctx, -440, -80, 880, 160, 80); ctx.fillStyle = '#FFFFFF'; ctx.fill(); ctx.shadowBlur = 0;
-    ctx.fillStyle = env.accent; ctx.beginPath(); ctx.arc(-362, 0, 36, 0, Math.PI * 2); ctx.fill();
-    txt(ctx, 'AV', -362, 13, 34, F.display, '#0B1020');
+    ctx.fillStyle = '#0B1020'; ctx.beginPath(); ctx.arc(-362, 0, 50, 0, Math.PI * 2); ctx.fill();
+    if (!brand(ctx, env, -362, 0, 80)) txt(ctx, 'AV', -362, 13, 34, F.display, env.accent);
     const url = 'alvecapital.fr', shown = url.slice(0, Math.floor(url.length * prog(lt, 0.45, 0.8))), z = fit(ctx, url, F.black, 80, 50, 680);
     txt(ctx, shown, -300, 28, z, F.black, '#0B1020', 'left');
     font(ctx, z, F.black); const cw = ctx.measureText(shown).width;
@@ -285,8 +286,8 @@ function chrome(ctx, env, t) {
   const F = env.F;
   ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, 0, W, 6);
   ctx.fillStyle = env.accent; ctx.fillRect(0, 0, W * clamp(t / env.total, 0, 1), 6);
-  rr(ctx, 44, 64, 92, 92, 18); ctx.fillStyle = env.accent; ctx.fill();
-  txt(ctx, 'AV', 90, 128, 52, F.display, '#0B1020');
+  rr(ctx, 44, 64, 92, 92, 18); ctx.fillStyle = 'rgba(8,14,32,0.82)'; ctx.fill();
+  if (!brand(ctx, env, 90, 110, 82)) txt(ctx, 'AV', 90, 128, 52, F.display, env.accent);
   rr(ctx, 146, 64, 390, 92, 18); ctx.fillStyle = 'rgba(8,14,32,0.82)'; ctx.fill();
   txt(ctx, 'AL VE CAPITAL', 166, 108, 34, F.black, '#FFFFFF', 'left');
   ctx.fillStyle = Math.floor(t * 1.6) % 2 === 0 ? '#FF3B3B' : 'rgba(255,59,59,0.35)';
@@ -307,7 +308,7 @@ function stinger(ctx, env, t) {
   const d = Math.abs(t - B);
   if (d < 0.1) {
     ctx.save(); ctx.globalAlpha = 1 - d / 0.1;
-    txt(ctx, 'AL VE CAPITAL', 540, 1000, 110, env.F.display, env.accent); ctx.restore();
+    brand(ctx, env, 540, 790, 260); txt(ctx, 'AL VE CAPITAL', 540, 1000, 110, env.F.display, env.accent); ctx.restore();
   }
 }
 
