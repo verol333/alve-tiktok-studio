@@ -26,7 +26,7 @@ async function checks(file, tl, audio) {
   if (!v || v.width !== 1080 || v.height !== 1920) problems.push('format image incorrect');
   if (!a) problems.push('pas de son');
   if (!(Math.abs(dur - tl.total) <= 1)) problems.push('durée incohérente');
-  if (size < 300000 || size > 60000000) problems.push('taille de fichier anormale (' + (size / 1e6).toFixed(1) + ' Mo)');
+  if (size < 300000 || size > 1500000000) problems.push('taille de fichier anormale (' + (size / 1e6).toFixed(1) + ' Mo)');
   if (mean < -40) problems.push('son trop faible');
   if (problems.length) throw new Error('Contrôle technique : ' + problems.join(', '));
   return { duration: Math.round(dur * 10) / 10, size, mean_volume: mean, scenes: tl.scenes.length };
@@ -148,12 +148,17 @@ async function deliver(job, final, tl, audio, type, voice) {
     try {
       const init = await api('upload_init', { video_size: size });
       if (init.dry_run) { console.log('Montage d\u2019essai : aucun envoi'); await api('done'); return; }
-      const put = await fetch(init.upload_url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(size), 'Content-Range': 'bytes 0-' + (size - 1) + '/' + size },
-        body: file,
-      });
-      if (!put.ok) throw new Error('TikTok a refus\u00e9 le fichier (' + put.status + ') ' + (await put.text()).slice(0, 200));
+      // Envoi par morceaux : TikTok refuse un bloc unique de plus de 64 Mo.
+      const chunk = init.chunk_size || size, count = init.chunk_count || 1;
+      for (let k = 0; k < count; k++) {
+        const a = k * chunk, z = k === count - 1 ? size : a + chunk;
+        const put = await fetch(init.upload_url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': String(z - a), 'Content-Range': 'bytes ' + a + '-' + (z - 1) + '/' + size },
+          body: file.subarray(a, z),
+        });
+        if (!put.ok) throw new Error('TikTok a refus\u00e9 le fichier (' + put.status + ') ' + (await put.text()).slice(0, 200));
+      }
       res.publish_id = init.publish_id;
       console.log('Vid\u00e9o envoy\u00e9e dans les brouillons TikTok');
     } catch (e) { res.tiktok_error = String((e && e.message) || e); console.error('TikTok : ' + res.tiktok_error); }
