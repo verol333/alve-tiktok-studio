@@ -23,5 +23,7 @@ export async function buildEnv(job, tl, DIR, particles) {
     if (env.show.sport_emoji) env.emoji[env.show.sport_emoji] = await loadEmoji(env.show.sport_emoji);
   }
   for (const s of job.scenes) if (s.emoji && !(s.emoji in env.emoji)) env.emoji[s.emoji] = await loadEmoji(s.emoji);
+  // Styles v2 (Télé / Face-à-face) : couleurs des clubs, plans de fond, particules.
+  if (env.style.theme) { const { prepV2Env } = await import('./v2/index.mjs'); await prepV2Env(env, tl, DIR); }
   return env;
 }
