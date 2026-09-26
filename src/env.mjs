@@ -14,6 +14,7 @@ export async function buildEnv(job, tl, DIR, particles) {
     hudSub: style.hud_sub || 'Analyse foot du jour', bgAlpha: job.video_type === 'site' ? 0.2 : 0.9,
   };
   if (!Array.isArray(env.style.transitions) || !env.style.transitions.length) env.style.transitions = ['zoom', 'slide', 'whip', 'flash'];
+  env.logo = job.logo_url ? await loadImg(job.logo_url) : null;
   env.bg = await loadImg(job.backgrounds[(style.background || 0) % job.backgrounds.length]);
   for (const p of job.picks) env.logos.push({ home: await loadImg(p.logo_home), away: await loadImg(p.logo_away) });
   if (env.show) {
