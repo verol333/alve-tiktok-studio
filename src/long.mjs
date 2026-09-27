@@ -25,6 +25,7 @@ import { drawWalkPhone, CW, CH } from './walkPhone.mjs';
 import { alignScenes } from './align.mjs';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from './draw.mjs';
 import { prepCuts, drawCut, cutSfx } from './longFx.mjs';
+import { TK, tkCaption, tkSfx } from './tk.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
 const P = { a: '#33D98E', b: '#818CF8', d1: '#0A0F1E', d2: '#1C2336', ink: '#E7ECFB', mute: '#9AA4C6' };
@@ -410,6 +411,15 @@ function drawHudV(ctx, env, s, t, light) {
 function drawFrameV(ctx, env, tl, i, t) {
   const s = tl.scenes[i], lt = t - s.start;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  const tk = s.look && TK[s.look.type];
+  if (tk) {
+    const r = tk(ctx, env, s, lt, t) || {};
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    tkCaption(ctx, env, s, lt, r.capY || 1560);
+    drawHudV(ctx, env, s, t, false);
+    finishFx(ctx, s, lt);
+    return;
+  }
   const look = s.look && LOOKS[s.look.type];
   if (look) {
     stageV(ctx, KV[s.look.type] || 0.72, s.look.type === 'kinetic' ? 960 : 900);
@@ -595,6 +605,7 @@ function events(tl, env) {
   const ev = cutSfx(env);
   tl.scenes.forEach((s) => {
     if (s.look) for (const [name, at, vol] of lookSfx(s)) ev.push({ name, at: s.start + at, vol });
+    if (s.look) for (const [name, at, vol] of tkSfx(s)) ev.push({ name, at: s.start + at, vol });
     if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
     if (s.kind === 'chapter') ev.push({ name: 'rise', at: s.start - 0.4, vol: 0.3 }, { name: 'impact', at: s.start + 0.35, vol: 0.55 });
     if (s.kind === 'point') ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.35 });
