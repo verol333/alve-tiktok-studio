@@ -15,7 +15,7 @@ import { run } from './sh.mjs';
 // Chaque image lue sur le canevas garde ~8 Mo que le processus ne rend jamais :
 // d'un seul bloc, une vidéo de 90 s saturait les 16 Go de la machine. Le montage
 // est donc découpé en segments de 20 s, chacun dans un processus séparé.
-const SEG = 600, PAR = 2;
+const SEG = 150, PAR = 2;
 const mem = () => 'mémoire ' + Math.round(process.memoryUsage().rss / 1e6) + ' Mo, libre ' + Math.round(freemem() / 1e6) + ' Mo';
 
 export async function renderVideo(spec, tl, out, DIR) {
