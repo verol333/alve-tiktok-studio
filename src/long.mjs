@@ -1,3 +1,4 @@
+import './safeCtx.mjs';
 // Vidéo YouTube longue (1920x1080) : présentation du site avec ses VRAIS écrans.
 // À gauche : chapitre, titre, points clés. À droite : un téléphone qui affiche
 // les écrans réels du site, filmés juste avant le montage (défilement, appuis).
