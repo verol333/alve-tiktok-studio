@@ -1,3 +1,4 @@
+import './safeCtx.mjs';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { writeFileSync } from 'node:fs';
