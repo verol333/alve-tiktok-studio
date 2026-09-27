@@ -1,3 +1,4 @@
+import './safeCtx.mjs';
 // Un segment de la vidéo longue, monté dans son propre processus.
 import { readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
