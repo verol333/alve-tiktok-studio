@@ -23,11 +23,12 @@ export const TK2 = {
       font(ctx, 42, env.F.xb); const lines = wrapL(ctx, m.text, 640), bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 70, bh = lines.length * 56 + 60;
       const bx = me ? x0 + w0 - 40 - bw : x0 + 40;
       if (!me && lt > t0 - 0.7 && lt < t0) { ctx.fillStyle = '#202C33'; rr(ctx, bx, y, 170, 90, 30); ctx.fill(); for (let d = 0; d < 3; d++) { ctx.fillStyle = rgba('#FFFFFF', 0.35 + 0.5 * Math.max(0, Math.sin(lt * 9 - d))); ctx.beginPath(); ctx.arc(bx + 50 + d * 36, y + 45, 11, 0, Math.PI * 2); ctx.fill(); } }
+      if (me && lt > t0 - 1.1 && lt < t0) { const n = Math.ceil(m.text.length * prog(lt, t0 - 1.1, 1.0)); ctx.fillStyle = '#1F2C34'; rr(ctx, x0 + 30, bot - 140, w0 - 60, 100, 50); ctx.fill(); tx(ctx, m.text.slice(Math.max(0, n - 28), n) + (Math.floor(lt * 4) % 2 ? '|' : ''), x0 + 80, bot - 75, 38, env.F.xb, '#E9EDEF'); }
       const p = easeBack(prog(lt, t0, 0.35)); if (p <= 0) return;
       pop(ctx, p, me ? bx + bw : bx, y + bh / 2, () => {
         ctx.fillStyle = me ? '#005C4B' : '#202C33'; rr(ctx, bx, y, bw, bh, 30); ctx.fill();
         lines.forEach((l, i) => tx(ctx, l, bx + 35, y + 68 + i * 56, 42, env.F.xb, m.hot ? '#FFD23F' : '#E9EDEF'));
-        tx(ctx, (L.time || '19:42') + (me ? '  ✓✓' : ''), bx + bw - 25, y + bh - 16, 24, env.F.xb, me ? '#53BDEB' : '#8696A0', 'right');
+        tx(ctx, (L.time || '19:42') + '', bx + bw - 25, y + bh - 16, 24, env.F.xb, me ? '#53BDEB' : '#8696A0', 'right');
       });
       y += bh + 26;
     });
@@ -71,7 +72,7 @@ export const TK2 = {
       tx(ctx, L.user || 'utilisateur', 225, y + 80, 34, env.F.xb, '#8A8B91'); font(ctx, 44, env.F.xb); wrapL(ctx, L.text || '', 720).slice(0, 3).forEach((l, i) => tx(ctx, l, 225, y + 140 + i * 56, 44, env.F.xb, '#161823'));
       tx(ctx, 'Répondre', 225, y + 300, 30, env.F.xb, '#8A8B91'); tx(ctx, '♥ ' + (L.likes || '2 841'), W - 110, y + 300, 32, env.F.xb, '#FE2C55', 'right'); });
     const r = easeBack(prog(lt, AT(s, L.reply_at || 0.55), 0.4));
-    pop(ctx, r, W / 2, 1050, () => { ctx.fillStyle = '#3DFFB5'; rr(ctx, 170, 980, W - 240, 150, 36); ctx.fill(); tx(ctx, 'alvecapital  ✓  a répondu', 210, 1040, 30, env.F.xb, '#04110B'); tx(ctx, L.reply || 'Réponse dans cette vidéo', 210, 1095, 42, env.F.display, '#04110B'); });
+    pop(ctx, r, W / 2, 1050, () => { ctx.fillStyle = '#3DFFB5'; rr(ctx, 170, 980, W - 240, 150, 36); ctx.fill(); tx(ctx, 'alvecapital · a répondu', 210, 1040, 30, env.F.xb, '#04110B'); tx(ctx, L.reply || 'Réponse dans cette vidéo', 210, 1095, 42, env.F.display, '#04110B'); });
     return { capY: 1640 };
   },
   ticket(ctx, env, s, lt) {
@@ -86,14 +87,14 @@ export const TK2 = {
       tx(ctx, String(L.odd || ''), W - 170, y + 540, 70, env.F.display, '#0A9A64', 'right');
       tx(ctx, 'Code coupon', 140, y + 660, 32, env.F.xb, '#5B6478'); tx(ctx, L.code || 'ALVE25', W - 140, y + 665, 48, env.F.display, '#0E1A2E', 'right'); });
     const tp = easeBack(prog(lt, AT(s, L.toast_at || 0.7), 0.4));
-    pop(ctx, tp, W / 2, 1310, () => { ctx.fillStyle = '#1F2330'; rr(ctx, W / 2 - 300, 1260, 600, 100, 50); ctx.fill(); tx(ctx, '✓  ' + (L.toast || 'Code copié'), W / 2, 1325, 40, env.F.xb, '#3DFFB5', 'center'); });
+    pop(ctx, tp, W / 2, 1310, () => { ctx.fillStyle = '#1F2330'; rr(ctx, W / 2 - 300, 1260, 600, 100, 50); ctx.fill(); tx(ctx, (L.toast || 'Code copié'), W / 2, 1325, 40, env.F.xb, '#3DFFB5', 'center'); });
     return { capY: 1640 };
   },
 };
 
 export function tk2Sfx(s) {
   const L = s.look || {}, out = [];
-  if (L.type === 'chat') times(s, L.msgs || []).forEach((t) => out.push(['pop', t, 0.55]));
+  if (L.type === 'chat') times(s, L.msgs || []).forEach((t, k) => { const me = (L.msgs[k] || {}).from === 'me'; out.push(me ? ['keys', t - 1.1, 0.5] : ['keys_s', t - 0.7, 0.3], ['pop', t, 0.55]); });
   if (L.type === 'search') { const t1 = AT(s, 0.05), t2 = AT(s, L.typed_at || 0.45); out.push(['keys_s', t1, 0.4]); (L.results || []).forEach((r, i) => out.push(['whoosh', t2 + 0.15 + i * 0.25, 0.3])); if (L.badge) out.push(['impact', AT(s, L.badge_at || 0.85), 0.8]); }
   if (L.type === 'notif') times(s, L.notifs || []).forEach((t) => out.push(['ding', t, 0.55]));
   if (L.type === 'comment') out.push(['pop', 0.05, 0.5], ['ding', AT(s, L.reply_at || 0.55), 0.55]);
