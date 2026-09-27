@@ -24,10 +24,11 @@ import { Clip } from './clip.mjs';
 import { drawWalkPhone, CW, CH } from './walkPhone.mjs';
 import { alignScenes } from './align.mjs';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from './draw.mjs';
+import { prepCuts, drawCut, cutSfx } from './longFx.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
 const P = { a: '#33D98E', b: '#818CF8', d1: '#0A0F1E', d2: '#1C2336', ink: '#E7ECFB', mute: '#9AA4C6' };
-const ACCENTS = ['#33D98E', '#818CF8', '#F3C969', '#22D3EE', '#FB923C', '#F472B6'];
+const ACCENTS = ['#33D98E', '#F3C969', '#22D3EE', '#FB923C'];
 const accentOf = (s) => ACCENTS[(s.chapter || 0) % ACCENTS.length];
 const COL = { x: 120, w: 1060, cx: 650 };
 // Taille réelle de l'image : 1920x1080, ou 1080x1920 pour le Reel Facebook vertical.
@@ -67,11 +68,11 @@ function background(ctx, env, s, t) {
   [[0.2, 0.3, 0.23], [0.8, 0.7, 0.17]].forEach(([fx, fy, sp], i) => {
     const x = W * fx + Math.sin(t * sp + i) * 260, y = H * fy + Math.cos(t * sp * 0.8 + i) * 160;
     const rg = ctx.createRadialGradient(x, y, 0, x, y, 720);
-    rg.addColorStop(0, rgba(i ? P.b : acc, 0.18)); rg.addColorStop(1, rgba(acc, 0));
+    rg.addColorStop(0, rgba(i ? (env.look ? env.look.hot : P.a) : (env.look ? env.look.accent : acc), 0.13)); rg.addColorStop(1, rgba(acc, 0));
     ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
   });
   ctx.fillStyle = '#FFFFFF';
-  if (s.kind !== 'cta' && s.kind !== 'outro') for (const p of env.particles) {
+  if (env.dots) for (const p of env.particles) {
     const y = (((p.y - t * p.v) % H) + H) % H;
     ctx.globalAlpha = p.a;
     ctx.beginPath(); ctx.arc(p.x + Math.sin(t + p.y) * 12, y, p.s, 0, Math.PI * 2); ctx.fill();
@@ -545,6 +546,7 @@ export async function buildEnv(spec, DIR) {
 // Images f0 à f1 (exclue) de la vidéo, encodées dans le fichier out.
 export async function renderSegment(env, tl, f0, f1, out) {
   const canvas = createCanvas(SW, SH), ctx = canvas.getContext('2d');
+  prepCuts(env, tl);
   const ff = spawn('ffmpeg', ['-y', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', SW + 'x' + SH, '-r', String(FPS), '-i', '-',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-maxrate', '10000k', '-bufsize', '20000k', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'ignore', 'pipe'] });
   let errTail = '';
@@ -575,6 +577,7 @@ export async function renderSegment(env, tl, f0, f1, out) {
     env.brollFrame = reader ? await reader.next() : null;
     env.clipFrame = clip ? ((await clip.next()) || null) : null;
     drawFrame(ctx, env, tl, i, t);
+    drawCut(ctx, env, t, SW, SH);
     const img = ctx.getImageData(0, 0, SW, SH);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
     if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
@@ -588,7 +591,8 @@ export async function renderSegment(env, tl, f0, f1, out) {
 }
 
 function events(tl, env) {
-  const ev = [];
+  prepCuts(env, tl);
+  const ev = cutSfx(env);
   tl.scenes.forEach((s) => {
     if (s.look) for (const [name, at, vol] of lookSfx(s)) ev.push({ name, at: s.start + at, vol });
     if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
@@ -718,7 +722,7 @@ export async function runLong(job, DIR) {
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
-  await mixAudio(DIR, tl, vo.files, events(tl, env), audio);
+  await mixAudio(DIR, tl, vo.files, events(tl, Object.assign(env, { look, logo: null })), audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
   const { out } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', final]);
   const info = JSON.parse(out);
@@ -726,7 +730,7 @@ export async function runLong(job, DIR) {
   if (!v || v.width !== (spec.vertical ? 1080 : W) || v.height !== (spec.vertical ? 1920 : H) || !a) throw new Error('Contrôle technique : format ou son incorrect');
   console.log('Contrôle technique OK : ' + parseFloat(info.format.duration).toFixed(1) + ' s');
   const prev = join(DIR, 'preview.mp4');
-  await run('ffmpeg', ['-y', '-i', final, '-vf', spec.vertical ? 'scale=720:-2' : 'scale=1280:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', prev]);
+  await run('ffmpeg', ['-y', '-i', final, '-vf', spec.vertical ? 'scale=1080:-2' : 'scale=1600:-2', '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-maxrate', '3500k', '-bufsize', '7000k', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', prev]);
   const url = await publishPreview(prev);
   console.log('Aperçu : ' + url);
   const full = await publishPreview(final);
