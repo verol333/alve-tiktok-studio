@@ -747,7 +747,7 @@ export function lookImages(scenes) {
   const set = new Set();
   for (const s of scenes) {
     const L = s.look; if (!L) continue;
-    [L.shot, ...(L.cards || []).flatMap((c) => [c.home_logo, c.away_logo]), L.home_logo, L.away_logo, ...(L.cards || []).map((c) => c.logo), ...(L.legs || []).map((l) => l.logo), ...(L.logos || []).map((b) => b.logo), ...(L.books || []).map((b) => b.logo)].forEach((u) => u && set.add(u));
+    [L.art, L.shot, ...(L.cards || []).flatMap((c) => [c.home_logo, c.away_logo]), L.home_logo, L.away_logo, ...(L.cards || []).map((c) => c.logo), ...(L.legs || []).map((l) => l.logo), ...(L.logos || []).map((b) => b.logo), ...(L.books || []).map((b) => b.logo)].forEach((u) => u && set.add(u));
   }
   return [...set];
 }
