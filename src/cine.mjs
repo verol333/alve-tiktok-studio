@@ -12,8 +12,8 @@ export function setStage(w, h) { SW = w; SH = h; VERT = h > w; }
 const INK = '#0B1020', PAPER = '#F4F6FB', MUTE_D = '#5B6478', MUTE_L = '#9AA4C6';
 const GREEN = '#10B981', RED = '#EF4444';
 const HUES = {
-  mint: ['#33D98E', '#0EA5E9'], indigo: ['#818CF8', '#C084FC'], gold: ['#F3C969', '#FB923C'],
-  red: ['#F87171', '#FB7185'], cyan: ['#22D3EE', '#818CF8'],
+  mint: ['#33D98E', '#0EA5E9'], indigo: ['#22D3EE', '#F3C969'], gold: ['#F3C969', '#FB923C'],
+  red: ['#F87171', '#FB7185'], cyan: ['#22D3EE', '#33D98E'],
 };
 // Identité visuelle de la vidéo : ses couleurs remplacent les teintes d'origine.
 let LOOK = null;
@@ -286,7 +286,7 @@ export const LOOKS = {
     const L = s.look, bg = L.bg || 'mesh', light = bg === 'light';
     if (bg === 'broll') bgBroll(ctx, env, s, lt, t); else if (light) bgLight(ctx, s, t); else bgMesh(ctx, s, t);
     if (L.bars) bars(ctx);
-    const acc = light ? (hue(s)[0] === '#F3C969' ? '#D97706' : hue(s)[0] === '#33D98E' ? GREEN : '#4F46E5') : hue(s)[0];
+    const acc = light ? (hue(s)[0] === '#F3C969' ? '#D97706' : hue(s)[0] === '#33D98E' ? GREEN : '#0E7490') : hue(s)[0];
     if (L.kicker) {
       const a = easeOut(prog(lt, 0.1, 0.5));
       ctx.save(); ctx.globalAlpha *= a;
@@ -367,7 +367,7 @@ export const LOOKS = {
     const mo = rest ? null : sayAt(s, fr(L.odd));
     if (mo != null) scribble(ctx, 520, 552, 300, 150, easeOut(prog(lt, mo + 0.05, 0.7)), '#F59E0B');
     const b = rest ? 1 : easeOut(prog(lt, T(s, 0.3), 0.4));
-    if (b > 0) flowArrow(ctx, 830, 540, 1010, 540, b, lt, '#4F46E5');
+    if (b > 0) flowArrow(ctx, 830, 540, 1010, 540, b, lt, '#0E7490');
     const gx = 1380, gy = 540, R = 220, a0 = -Math.PI / 2;
     const f = rest ? L.pct / 100 : (easeOut(prog(lt, T(s, 0.35), 0.9)) * L.pct) / 100;
     ctx.lineWidth = 46;
@@ -387,7 +387,7 @@ export const LOOKS = {
 
   odds(ctx, env, s, lt, t) {
     const L = s.look; bgLight(ctx, s, t);
-    const acc = '#4F46E5';
+    const acc = '#0E7490';
     const a0 = easeOut(prog(lt, 0, 0.5));
     ctx.save(); ctx.globalAlpha *= a0;
     fitTxt(ctx, L.home + '  vs  ' + L.away, W / 2, 170 - (1 - a0) * 20, 68, 40, W - 300, env.F.black, INK);
@@ -618,7 +618,7 @@ export const LOOKS = {
 
   mail(ctx, env, s, lt, t) {
     const L = s.look; bgLight(ctx, s, t);
-    const code = String(L.code || '482916'), t1 = T(s, 0.05), t2 = T(s, 0.45), t3 = T(s, 0.8), IND = '#4F46E5';
+    const code = String(L.code || '482916'), t1 = T(s, 0.05), t2 = T(s, 0.45), t3 = T(s, 0.8), IND = '#0E7490';
     const a = easeBack(prog(lt, t1, 0.6));
     if (a > 0) {
       ctx.save(); ctx.translate(560, 500 + (1 - clamp(a, 0, 1)) * 300 + Math.sin(t * 1.1) * 5); ctx.rotate(-0.03); ctx.globalAlpha *= clamp(a, 0, 1);
