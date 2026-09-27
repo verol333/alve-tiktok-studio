@@ -30,7 +30,7 @@ export async function makeSfx(dir, total) {
 export async function tightVoice(src, out) {
   const edge = (keep) => 'silenceremove=start_periods=1:start_threshold=-42dB:start_silence=' + keep;
   const af = [edge(0.03), 'areverse', edge(0.06), 'areverse',
-    'silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-42dB:stop_silence=0.35'].join(',');
+    'silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-42dB:stop_silence=0.12'].join(',');
   try {
     await run('ffmpeg', ['-y', '-i', src, '-af', af, '-ar', '44100', '-ac', '1', out]);
     const a = await duration(src), b = await duration(out);
