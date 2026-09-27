@@ -1,3 +1,4 @@
+import './safeCtx.mjs';
 // Vidéo TikTok verticale « premium » (1080x1920) : le VRAI site filmé en vidéo
 // dans un téléphone (curseur, appuis, saisie, défilement), schémas chiffrés,
 // plans d'illustration, titres tapés, zooms et transitions.
