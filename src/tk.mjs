@@ -265,7 +265,7 @@ export const TK = {
   },
 };
 
-if (process.env.TK2_ON) for (const [k, f] of Object.entries(TK2)) TK[k] = (ctx, env, s, lt, t) => { bg(ctx, env, s, t, A.acc); return f(ctx, env, s, lt, t); };
+for (const [k, f] of Object.entries(TK2)) TK[k] = (ctx, env, s, lt, t) => { bg(ctx, env, s, t, A.acc); return f(ctx, env, s, lt, t); };
 
 export function tkSfx(s) {
   const L = s.look || {}, out = [...tk2Sfx(s)];
