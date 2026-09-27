@@ -49,7 +49,18 @@ function stamp(ctx, env, s, cx, cy, lt, at, color, size) {
 }
 
 // ── Fond : dégradé nuit, halo mobile, sol en grille 3D qui défile, particules ──
+// Illustration plein écran (visuel graphique) : zoom et glissement lents de caméra.
+function artBg(ctx, im, t, lt, dur) {
+  const p = clamp(lt / Math.max(1, dur || 4), 0, 1), z = 1.08 + 0.12 * p;
+  const k = Math.max(W / im.width, H / im.height) * z, w = im.width * k, h = im.height * k;
+  const dx = Math.sin(t * 0.35) * 22, dy = -30 * p + Math.cos(t * 0.3) * 14;
+  ctx.drawImage(im, (W - w) / 2 + dx, (H - h) / 2 + dy, w, h);
+  const sh = ctx.createLinearGradient(0, H * 0.62, 0, H); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.78)'); ctx.fillStyle = sh; ctx.fillRect(0, 0, W, H);
+  const gl = ((lt * 0.45) % 1.6) - 0.3; const g = ctx.createLinearGradient(W * gl - 300, 0, W * gl + 300, H); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.07)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
 function bg(ctx, env, s, t, acc) {
+  const art = img(env, s.look && s.look.art);
+  if (art) { const lt = t - s.start; artBg(ctx, art, t, lt, s.dur); for (const p of env.particles || []) { const y = (p.y - t * p.v * 1.6) % H; ctx.fillStyle = rgba(acc, p.a * 0.6); ctx.fillRect(p.x, y < 0 ? y + H : y, p.s, p.s); } ctx.fillStyle = 'rgba(2,4,10,' + (s.look.type === 'art' ? 0 : 0.45) + ')'; ctx.fillRect(0, 0, W, H); return; }
   const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#04060D'); g.addColorStop(0.55, '#0A1122'); g.addColorStop(1, '#03050B');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const hx = W / 2 + Math.sin(t * 0.6) * 260, hy = 700 + Math.cos(t * 0.45) * 160;
@@ -100,6 +111,12 @@ export function tkCaption(ctx, env, s, lt, y) {
 }
 
 export const TK = {
+  // Visuel graphique seul : illustration animée + un mot clé discret en haut.
+  art(ctx, env, s, lt, t) {
+    const L = s.look; bg(ctx, env, s, t, A.acc);
+    if (L.kicker) { const k = easeOut(prog(lt, 0.3, 0.5)); ctx.save(); ctx.globalAlpha = k; font(ctx, 40, env.F.xb); const w = ctx.measureText(L.kicker).width + 80; ctx.fillStyle = 'rgba(4,8,18,0.72)'; rr(ctx, W / 2 - w / 2, 170, w, 80, 40); ctx.fill(); ctx.strokeStyle = rgba(A.acc, 0.8); ctx.lineWidth = 3; ctx.stroke(); text(ctx, L.kicker, W / 2, 224, 40, env.F.xb, '#FFFFFF'); ctx.restore(); }
+    return { capY: 1640 };
+  },
   // Compte à rebours 5 → 0 dans un anneau lumineux.
   countdown(ctx, env, s, lt, t) {
     const L = s.look; bg(ctx, env, s, t, A.acc);
@@ -258,4 +275,4 @@ export function tkSfx(s) {
   if (L.type === 'subscribe') { const tap = T(s, L.tap_at == null ? 0.35 : L.tap_at); out.push(['whoosh', 0.1, 0.35], ['pop', tap, 0.7], ['ding', tap + 0.3, 0.6]); }
   return out;
 }
-export const tkImages = (L) => [L.shot, ...(L.cards || []).flatMap((c) => [c.home_logo, c.away_logo])].filter(Boolean);
+export const tkImages = (L) => [L.art, L.shot, ...(L.cards || []).flatMap((c) => [c.home_logo, c.away_logo])].filter(Boolean);
