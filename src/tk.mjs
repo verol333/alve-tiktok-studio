@@ -3,6 +3,7 @@
 // zoomée et entourée, règle en relief + tampon, mur de matchs, bouton s'abonner)
 // + sous-titres animés mot par mot.
 import { clamp, prog, easeOut, easeBack, rgba, rr, font } from './draw.mjs';
+import { TK2, tk2Sfx } from './tk2.mjs';
 
 const W = 1080, H = 1920;
 const A = { acc: '#3DFFB5', hot: '#FFD23F', red: '#FF4D5E', ink: '#FFFFFF', mute: '#9AA4C6' };
@@ -264,8 +265,10 @@ export const TK = {
   },
 };
 
+for (const [k, f] of Object.entries(TK2)) TK[k] = (ctx, env, s, lt, t) => { bg(ctx, env, s, t, A.acc); return f(ctx, env, s, lt, t); };
+
 export function tkSfx(s) {
-  const L = s.look || {}, out = [];
+  const L = s.look || {}, out = [...tk2Sfx(s)];
   if (L.type === 'countdown') { const d = L.span || Math.min(3.2, s.dur - 0.3); for (let i = 0; i < 5; i++) out.push(['pop', (d / 5) * i, 0.45]); out.push(['impact', d, 0.8], ['whoosh', 0, 0.3]); }
   if (L.type === 'strike') { (L.items || []).forEach((it, i) => { const at = sayAt(s, it.say || it.label, T(s, 0.08 + i * 0.22)); out.push(['whoosh', at - 0.1, 0.35], ['impact', at + 0.3, 0.55]); }); if (L.final) out.push(['ding', sayAt(s, L.final_say, T(s, 0.8)), 0.6]); }
   if (L.type === 'matchcard') out.push(['whoosh', 0, 0.5], ['pop', 0.45, 0.4], ['pop', 0.6, 0.4], ['impact', 0.8, 0.6], ['ding', 1.0, 0.35]);
@@ -275,4 +278,4 @@ export function tkSfx(s) {
   if (L.type === 'subscribe') { const tap = T(s, L.tap_at == null ? 0.35 : L.tap_at); out.push(['whoosh', 0.1, 0.35], ['pop', tap, 0.7], ['ding', tap + 0.3, 0.6]); }
   return out;
 }
-export const tkImages = (L) => [L.art, L.shot, ...(L.cards || []).flatMap((c) => [c.home_logo, c.away_logo])].filter(Boolean);
+export const tkImages = (L) => [L.art, L.shot, L.home_logo, L.away_logo, ...(L.cards || []).flatMap((c) => [c.home_logo, c.away_logo])].filter(Boolean);
