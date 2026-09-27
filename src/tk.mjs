@@ -62,8 +62,15 @@ function artBg(ctx, im, t, lt, dur) {
 function bg(ctx, env, s, t, acc) {
   const art = img(env, s.look && s.look.art);
   if (art) { const lt = t - s.start; artBg(ctx, art, t, lt, s.dur); for (const p of env.particles || []) { const y = (p.y - t * p.v * 1.6) % H; ctx.fillStyle = rgba(acc, p.a * 0.6); ctx.fillRect(p.x, y < 0 ? y + H : y, p.s, p.s); } ctx.fillStyle = 'rgba(2,4,10,' + (s.look.type === 'art' ? 0 : 0.45) + ')'; ctx.fillRect(0, 0, W, H); return; }
-  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#04060D'); g.addColorStop(0.55, '#0A1122'); g.addColorStop(1, '#03050B');
+  const BGV = [['#04060D','#0A1122','#03050B','#2F7BFF'],['#0B0410','#1E0A26','#050208','#E0457B'],['#020D0A','#06231B','#010604','#20D38A'],['#100904','#2A1706','#060301','#FF9A1F'],['#040B12','#082A3A','#01060A','#1FC8E0'],['#0C0C0C','#1C1C22','#050505','#F2C94C']];
+  const vi = Math.abs(Math.round((s.start || 0) * 7.3)) % BGV.length, V = BGV[vi]; acc = V[3];
+  const g = ctx.createLinearGradient(0, 0, vi % 2 ? W : 0, H); g.addColorStop(0, V[0]); g.addColorStop(0.55, V[1]); g.addColorStop(1, V[2]);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.globalAlpha = 0.07; ctx.strokeStyle = acc; ctx.lineWidth = 3;
+  if (vi % 3 === 0) { for (let x = -H; x < W; x += 90) { ctx.beginPath(); ctx.moveTo(x + (t * 40) % 90, 0); ctx.lineTo(x + H + (t * 40) % 90, H); ctx.stroke(); } }
+  else if (vi % 3 === 1) { const o = (t * 30) % 120; for (let y = -120; y < H; y += 120) { ctx.beginPath(); ctx.moveTo(0, y + o); ctx.lineTo(W, y + o); ctx.stroke(); } for (let x = 0; x < W; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } }
+  else { for (let k = 1; k < 9; k++) { ctx.beginPath(); ctx.arc(W / 2, H * 0.42, k * 150 + (t * 60) % 150, 0, Math.PI * 2); ctx.stroke(); } }
+  ctx.restore();
   const hx = W / 2 + Math.sin(t * 0.6) * 260, hy = 700 + Math.cos(t * 0.45) * 160;
   const r = ctx.createRadialGradient(hx, hy, 0, hx, hy, 900); r.addColorStop(0, rgba(acc, 0.28)); r.addColorStop(1, rgba(acc, 0)); ctx.fillStyle = r; ctx.fillRect(0, 0, W, H);
   const r2 = ctx.createRadialGradient(W - hx * 0.6, 1500, 0, W - hx * 0.6, 1500, 700); r2.addColorStop(0, rgba(A.hot, 0.12)); r2.addColorStop(1, rgba(A.hot, 0)); ctx.fillStyle = r2; ctx.fillRect(0, 0, W, H);
