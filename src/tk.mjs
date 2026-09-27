@@ -27,6 +27,7 @@ function text3d(ctx, s, x, y, size, fam, c1, c2, depth) {
   ctx.fillStyle = g; ctx.shadowColor = rgba(c1, 0.6); ctx.shadowBlur = 40; ctx.fillText(s, x, y); ctx.shadowBlur = 0;
 }
 function circleLogo(ctx, im, cx, cy, r, ring) {
+  { const m = ctx.getTransform(); if (Math.abs(m.a * m.d - m.b * m.c) < 1e-6) return; } // échelle nulle (début d'animation) : rien à dessiner
   ctx.save(); ctx.shadowColor = rgba(ring, 0.7); ctx.shadowBlur = 50;
   ctx.fillStyle = '#0B1224'; ctx.beginPath(); ctx.arc(cx, cy, r + 10, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   ctx.strokeStyle = ring; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(cx, cy, r + 10, 0, Math.PI * 2); ctx.stroke();
