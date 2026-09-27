@@ -662,7 +662,8 @@ function fitWalk(tl, segs) {
     if (seg) {
       const len = Math.max(0.5, seg.end - seg.start);
       s.seg = seg; s.rate = 1;
-      if (len > s.dur) s.dur = len; // jamais accéléré : la scène s'allonge si besoin
+      // Extrait plus long que la voix : accéléré jusqu'à ×1,6 plutôt que de laisser un blanc.
+      if (len > s.dur) { s.rate = Math.min(1.6, len / s.dur); s.dur = len / s.rate; }
     }
     t += s.dur;
   });
