@@ -1,5 +1,6 @@
 // Minutage : chaque scène dure exactement le temps de sa voix (+ respiration).
 export function buildTimeline(scenes, durs, tight = false) {
+  tight = true; // vidéo rythmée : plus de longs blancs entre les scènes
   let t = 0; const out = [];
   scenes.forEach((s, i) => {
     // Respiration entre deux scènes (~1,5 s au total) pour laisser comprendre.
