@@ -12,7 +12,7 @@ export const TK2 = {
   chat(ctx, env, s, lt) {
     const L = s.look, msgs = L.msgs || [], ts = times(s, msgs), x0 = 70, w0 = W - 140, top = 250, bot = 1440;
     const a = easeOut(prog(lt, 0, 0.4)); ctx.save(); ctx.globalAlpha = a; ctx.translate(0, (1 - a) * 80);
-    ctx.fillStyle = '#0B141A'; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 50; rr(ctx, x0, top, w0, bot - top, 44); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0B141A'; rr(ctx, x0, top, w0, bot - top, 44); ctx.fill();
     ctx.save(); rr(ctx, x0, top, w0, 150, 44); ctx.clip(); ctx.fillStyle = '#1F2C34'; ctx.fillRect(x0, top, w0, 150); ctx.restore();
     ctx.fillStyle = L.color || '#25D366'; ctx.beginPath(); ctx.arc(x0 + 90, top + 75, 44, 0, Math.PI * 2); ctx.fill();
     tx(ctx, (L.name || '?')[0], x0 + 90, top + 92, 48, env.F.xb, '#0B141A', 'center');
@@ -39,7 +39,7 @@ export const TK2 = {
     const ga = easeOut(prog(lt, 0, 0.4)); ctx.save(); ctx.globalAlpha = ga; font(ctx, 150, env.F.display); let gx = W / 2 - G.reduce((w, [c]) => w + ctx.measureText(c).width, 0) / 2;
     for (const [c, col] of G) { tx(ctx, c, gx, 470, 150, env.F.display, col); gx += ctx.measureText(c).width; } ctx.restore();
     const n = Math.floor(q.length * prog(lt, t1, Math.max(0.3, t2 - t1))), sb = easeBack(prog(lt, 0.1, 0.4));
-    pop(ctx, sb, W / 2, 600, () => { ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 40; rr(ctx, 70, 540, W - 140, 130, 65); ctx.fill(); ctx.shadowBlur = 0;
+    pop(ctx, sb, W / 2, 600, () => { ctx.fillStyle = '#FFFFFF'; rr(ctx, 70, 540, W - 140, 130, 65); ctx.fill();
       ctx.strokeStyle = '#9AA0A6'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(150, 598, 22, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(166, 614); ctx.lineTo(186, 634); ctx.stroke();
       font(ctx, 40, env.F.xb); const lines = wrapL(ctx, q.slice(0, n), W - 330); const last = lines[lines.length - 1] || '';
       tx(ctx, last, 215, 620, 40, env.F.xb, '#202124'); if (Math.floor(lt * 2.5) % 2 === 0 && n < q.length + 1) { ctx.fillStyle = '#4285F4'; ctx.fillRect(220 + ctx.measureText(last).width, 585, 4, 50); } });
@@ -48,7 +48,7 @@ export const TK2 = {
       tx(ctx, r.title, 110, y + 62, 40, env.F.xb, '#8AB4F8'); tx(ctx, r.sub || '', 110, y + 115, 32, env.F.xb, '#BDC1C6');
       if (L.strike_at != null) { const sp = prog(lt, AT(s, L.strike_at) + i * 0.15, 0.25); ctx.strokeStyle = '#FF4D5E'; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(100, y + 75); ctx.lineTo(100 + (W - 200) * sp, y + 75); ctx.stroke(); }
       ctx.restore(); });
-    if (L.badge) { const b = easeBack(prog(lt, AT(s, L.badge_at || 0.85), 0.4)); pop(ctx, b, W / 2, 1400, () => { ctx.fillStyle = '#3DFFB5'; ctx.shadowColor = 'rgba(61,255,181,0.7)'; ctx.shadowBlur = 50; rr(ctx, W / 2 - 380, 1340, 760, 120, 60); ctx.fill(); ctx.shadowBlur = 0; tx(ctx, L.badge, W / 2, 1422, 58, env.F.display, '#04110B', 'center'); }); }
+    if (L.badge) { const b = easeBack(prog(lt, AT(s, L.badge_at || 0.85), 0.4)); pop(ctx, b, W / 2, 1400, () => { ctx.fillStyle = '#3DFFB5'; rr(ctx, W / 2 - 380, 1340, 760, 120, 60); ctx.fill(); tx(ctx, L.badge, W / 2, 1422, 58, env.F.display, '#04110B', 'center'); }); }
     return { capY: 1640 };
   },
   notif(ctx, env, s, lt) {
@@ -58,7 +58,7 @@ export const TK2 = {
     tx(ctx, L.date || 'dimanche 27 septembre', W / 2, 300, 40, env.F.xb, 'rgba(255,255,255,0.85)', 'center');
     tx(ctx, L.time || '21:47', W / 2, 520, 230, env.F.display, '#FFFFFF', 'center'); ctx.restore();
     list.forEach((n, k) => { const p = easeBack(prog(lt, ts[k], 0.45)); if (p <= 0) return; const y = 640 + k * 230 + (1 - p) * -200;
-      ctx.save(); ctx.globalAlpha = clamp(p, 0, 1); ctx.fillStyle = 'rgba(40,44,56,0.88)'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 30; rr(ctx, 60, y, W - 120, 200, 44); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.save(); ctx.globalAlpha = clamp(p, 0, 1); ctx.fillStyle = 'rgba(40,44,56,0.88)'; rr(ctx, 60, y, W - 120, 200, 44); ctx.fill();
       ctx.fillStyle = n.color || '#3DFFB5'; rr(ctx, 95, y + 45, 90, 90, 22); ctx.fill(); tx(ctx, n.icon || (n.app || 'A')[0], 140, y + 107, 50, env.F.display, '#04110B', 'center');
       tx(ctx, (n.app || 'AL VE CAPITAL').toUpperCase(), 215, y + 70, 28, env.F.xb, 'rgba(255,255,255,0.6)'); tx(ctx, 'maintenant', W - 100, y + 70, 28, env.F.xb, 'rgba(255,255,255,0.5)', 'right');
       tx(ctx, n.title, 215, y + 122, 42, env.F.xb, n.hot ? '#3DFFB5' : '#FFFFFF'); tx(ctx, n.body || '', 215, y + 170, 34, env.F.xb, 'rgba(255,255,255,0.8)'); ctx.restore(); });
@@ -66,7 +66,7 @@ export const TK2 = {
   },
   comment(ctx, env, s, lt) {
     const L = s.look, p = easeBack(prog(lt, 0.05, 0.45)), y = 560;
-    pop(ctx, p, W / 2, y + 150, () => { ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 40; rr(ctx, 60, y, W - 120, 330, 40); ctx.fill(); ctx.shadowBlur = 0;
+    pop(ctx, p, W / 2, y + 150, () => { ctx.fillStyle = '#FFFFFF'; rr(ctx, 60, y, W - 120, 330, 40); ctx.fill();
       ctx.fillStyle = L.color || '#FF4D5E'; ctx.beginPath(); ctx.arc(150, y + 95, 50, 0, Math.PI * 2); ctx.fill(); tx(ctx, (L.user || 'u')[0].toUpperCase(), 150, y + 113, 50, env.F.display, '#FFFFFF', 'center');
       tx(ctx, L.user || 'utilisateur', 225, y + 80, 34, env.F.xb, '#8A8B91'); font(ctx, 44, env.F.xb); wrapL(ctx, L.text || '', 720).slice(0, 3).forEach((l, i) => tx(ctx, l, 225, y + 140 + i * 56, 44, env.F.xb, '#161823'));
       tx(ctx, 'Répondre', 225, y + 300, 30, env.F.xb, '#8A8B91'); tx(ctx, '♥ ' + (L.likes || '2 841'), W - 110, y + 300, 32, env.F.xb, '#FE2C55', 'right'); });
@@ -77,7 +77,7 @@ export const TK2 = {
   ticket(ctx, env, s, lt) {
     const L = s.look, a = easeBack(prog(lt, 0, 0.45)), y = 420;
     const im = (u) => (u && env.imgs && env.imgs[u]) || null;
-    pop(ctx, a, W / 2, y + 380, () => { ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 50; rr(ctx, 90, y, W - 180, 760, 40); ctx.fill(); ctx.shadowBlur = 0;
+    pop(ctx, a, W / 2, y + 380, () => { ctx.fillStyle = '#FFFFFF'; rr(ctx, 90, y, W - 180, 760, 40); ctx.fill();
       ctx.save(); rr(ctx, 90, y, W - 180, 120, 40); ctx.clip(); ctx.fillStyle = '#0E1A2E'; ctx.fillRect(90, y, W - 180, 120); ctx.restore();
       tx(ctx, 'COUPON', 140, y + 78, 44, env.F.display, '#FFFFFF'); tx(ctx, '1 sélection', W - 140, y + 78, 32, env.F.xb, '#9AA4C6', 'right');
       [[L.home_logo, L.home, 270], [L.away_logo, L.away, W - 270]].forEach(([lg, nm, cx]) => { const i2 = im(lg); if (i2) ctx.drawImage(i2, cx - 70, y + 170, 140, 140); else { ctx.fillStyle = '#E6E9F2'; ctx.beginPath(); ctx.arc(cx, y + 240, 70, 0, Math.PI * 2); ctx.fill(); } tx(ctx, nm || '', cx, y + 370, 38, env.F.xb, '#0E1A2E', 'center'); });
