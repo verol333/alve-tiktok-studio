@@ -52,7 +52,9 @@ async function keyFrames(file, tl, type) {
 
 async function main() {
   const { job } = await api('job');
-  if (job.video_type === 'long') { const { runLong } = await import('./long.mjs'); return runLong(job, DIR); }
+  // Scènes « look » (motion design) : moteur cinéma, en vertical 1080x1920.
+  if (job.video_type !== 'long' && (job.scenes || []).some((s) => s.kind === 'look' && s.look)) job.style = { ...(job.style || {}), format: 'vertical' };
+  if (job.video_type === 'long' || (job.style || {}).format === 'vertical') { const { runLong } = await import('./long.mjs'); return runLong(job, DIR); }
   if ((job.style || {}).format === 'reel') {
     const { buildReel } = await import('./reel.mjs');
     const r = await buildReel(job, DIR);
