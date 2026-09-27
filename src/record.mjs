@@ -166,6 +166,8 @@ async function act(page, a, mark) {
     await smoothScroll(page, a.scroll, ms); await wait(300);
     return;
   }
+  // Attend qu'un élément apparaisse (hors champ si suivi d'un « restart »).
+  if (a.waitFor) { await locate(page, { ...a.waitFor, timeout: a.waitFor.timeout || 45000 }); await wait(a.wait || 300); return; }
   if (a.press) { await page.keyboard.press(a.press); await wait(a.wait || 900); return; }
   // Centre l'élément à l'écran (y compris dans un panneau qui défile), curseur dessus.
   if (a.center) {
@@ -232,6 +234,8 @@ export async function recordWalkthrough(job, dir, plan) {
         const P = (plan && plan[i]) || null;
         let wk = 0;
         for (const a of w.acts || []) {
+          // Coupure : ce qui a été filmé avant (attente, chargement) disparaît du montage.
+          if (a.restart) { seg.start = now(); seg.ev = []; continue; }
           if (P) {
             let at = null;
             if (a.say) {
