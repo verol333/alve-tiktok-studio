@@ -263,11 +263,11 @@ export const TK = {
     const a = easeBack(prog(lt, 0.1, 0.5)), tap = T(s, L.tap_at == null ? 0.35 : L.tap_at), done = lt > tap + 0.1;
     ctx.save(); ctx.translate(W / 2, 760); ctx.scale(a * (lt > tap && lt < tap + 0.2 ? 0.92 : 1), a);
     ctx.fillStyle = done ? '#2A2F3F' : A.red; ctx.shadowColor = rgba(done ? '#FFFFFF' : A.red, 0.6); ctx.shadowBlur = 50; rr(ctx, -360, -95, 720, 190, 95); ctx.fill(); ctx.shadowBlur = 0;
-    text(ctx, done ? 'ABONNÉ ✓' : "S'ABONNER", 0, 30, 88, env.F.display, '#FFFFFF'); ctx.restore();
+    text(ctx, done ? 'ABONNÉ' : "S'ABONNER", 0, 30, 88, env.F.display, '#FFFFFF'); ctx.restore();
     const hx = W / 2 + 200, hy = 900 + (1 - easeOut(prog(lt, tap - 0.5, 0.5))) * 400;
     ctx.save(); ctx.globalAlpha = 1 - prog(lt, tap + 0.6, 0.3); ctx.fillStyle = '#FFE0C2'; ctx.beginPath(); ctx.arc(hx, hy, 46, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(hx - 30, hy, 60, 170); ctx.restore();
     if (lt > tap) { const r = prog(lt, tap, 0.5); ctx.strokeStyle = rgba('#FFFFFF', 1 - r); ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(hx, hy - 20, 40 + r * 120, 0, Math.PI * 2); ctx.stroke(); }
-    const ba = easeBack(prog(lt, tap + 0.3, 0.4)); if (ba > 0) { ctx.save(); ctx.translate(W / 2, 1100); ctx.scale(ba, ba); ctx.rotate(Math.sin(lt * 18) * 0.25 * (1 - prog(lt, tap + 0.3, 1.2))); text(ctx, '🔔', 0, 60, 170, env.F.xb, A.hot); ctx.restore(); }
+    const ba = easeBack(prog(lt, tap + 0.3, 0.4)); if (ba > 0) { ctx.save(); ctx.translate(W / 2, 1100); ctx.scale(ba, ba); ctx.rotate(Math.sin(lt * 18) * 0.25 * (1 - prog(lt, tap + 0.3, 1.2))); ctx.fillStyle = A.hot; ctx.beginPath(); ctx.arc(0, 0, 70, Math.PI, 0); ctx.lineTo(95, 75); ctx.lineTo(-95, 75); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(0, 100, 22, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
     if (L.site) { const sa = easeOut(prog(lt, tap + 0.6, 0.4)); ctx.save(); ctx.globalAlpha = sa; text(ctx, L.site, W / 2, 1320, 64, env.F.black, A.acc); ctx.restore(); }
     return { capY: 1580 };
   },
