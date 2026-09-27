@@ -681,7 +681,7 @@ export async function runLong(job, DIR) {
   // Parcours FILMÉ en vidéo sur le vrai site (landing, inscription, menu, arbitrage, mise auto).
   // 2) La voix d'abord : le parcours est ensuite filmé au rythme exact de chaque mot.
   const vo = await voices(job, DIR);
-  const tl = buildTimeline(job.scenes, vo.durs);
+  const tl = buildTimeline(job.scenes, vo.durs, true);
   await alignScenes(tl, vo.files, DIR);
   const nw = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   const plan = {};
