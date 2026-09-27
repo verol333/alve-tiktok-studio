@@ -35,7 +35,7 @@ export async function renderVideo(spec, tl, out, DIR) {
 async function segment(specFile, [f0, f1, out], k) {
   const script = fileURLToPath(new URL('./renderSeg.mjs', import.meta.url));
   for (let a = 1; a <= 2; a++) {
-    const p = spawn(process.execPath, [script, specFile, String(f0), String(f1), out], { stdio: ['ignore', 'inherit', 'inherit'] });
+    const p = spawn(process.execPath, ['--expose-gc', script, specFile, String(f0), String(f1), out], { stdio: ['ignore', 'inherit', 'inherit'] });
     const [code, sig] = await once(p, 'close');
     if (code === 0) { console.log('Segment ' + (k + 1) + ' terminé — ' + mem()); return; }
     console.error('Segment ' + (k + 1) + ' interrompu (code ' + code + (sig ? ', ' + sig : '') + ')' + (a < 2 ? ' : nouvel essai' : ''));
@@ -61,6 +61,7 @@ export async function renderFrames(env, tl, f0, f1, out) {
     const img = ctx.getImageData(0, 0, W, H);
     const buf = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength);
     if (!ff.stdin.write(buf)) await once(ff.stdin, 'drain');
+    if (global.gc && (f - f0) % 15 === 0) global.gc();
     if ((f - f0) % 300 === 0) console.log('image ' + f + ' / ' + frames + ' — ' + mem());
   }
   closeBg(env);
