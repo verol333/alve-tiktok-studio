@@ -162,7 +162,7 @@ export const TK = {
       const sp = easeOut(prog(lt, at + 0.3, 0.22));
       if (sp > 0 && it.ok) { ctx.fillStyle = A.acc; ctx.beginPath(); ctx.arc(390, -80, 44 * easeBack(sp), 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#04140D'; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(370, -80); ctx.lineTo(386, -64); ctx.lineTo(412, -96); ctx.stroke(); }
       else if (sp > 0) { ctx.strokeStyle = A.red; ctx.lineWidth = 18; ctx.lineCap = 'round'; ctx.shadowColor = rgba(A.red, 0.9); ctx.shadowBlur = 24; ctx.beginPath(); ctx.moveTo(-400, 10); ctx.lineTo(-400 + 800 * sp, -14); ctx.stroke(); ctx.shadowBlur = 0;
-        ctx.fillStyle = A.red; ctx.beginPath(); ctx.arc(390, -80, 44 * easeBack(sp), 0, Math.PI * 2); ctx.fill(); text(ctx, '✕', 390, -62, 54, env.F.xb, '#FFFFFF'); }
+        ctx.fillStyle = A.red; ctx.beginPath(); ctx.arc(390, -80, 44 * easeBack(sp), 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(374, -96); ctx.lineTo(406, -64); ctx.moveTo(406, -96); ctx.lineTo(374, -64); ctx.stroke(); }
       ctx.restore();
     });
     if (L.final) {
