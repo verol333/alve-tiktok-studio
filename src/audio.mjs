@@ -17,6 +17,10 @@ export async function makeSfx(dir, total) {
   await gen('pop.wav', "aevalsrc='0.45*sin(2*PI*(500+900*exp(-28*t))*t)*exp(-15*t)':d=0.3:s=44100");
   await gen('tap.wav', "aevalsrc='0.5*sin(2*PI*950*t)*exp(-55*t)+0.3*(2*random(0)-1)*exp(-160*t)':d=0.15:s=44100");
   await gen('rise.wav', "aevalsrc='0.22*sin(2*PI*(200+700*t)*t)*(t/1.2)':d=1.2:s=44100");
+  // Tiroir-caisse, scintillement et basse « drop » (mots choc).
+  await gen('cash.wav', "aevalsrc='0.35*(sin(2*PI*2637*t)+sin(2*PI*3520*t))*exp(-9*t)*gte(t,0.08)+0.5*(2*random(0)-1)*exp(-60*t)':d=0.9:s=44100", ['-af', 'highpass=f=600']);
+  await gen('sparkle.wav', "aevalsrc='0.22*sin(2*PI*(2400+1800*t)*t)*exp(-7*t)*(0.6+0.4*sin(2*PI*28*t))':d=0.6:s=44100");
+  await gen('drop.wav', "aevalsrc='0.95*sin(2*PI*(38+220*exp(-9*t))*t)*exp(-3.2*t)':d=1.3:s=44100", ['-af', 'lowpass=f=900']);
   const chord = (a, b) => 'if(lt(mod(t,8),4),' + a + ',' + b + ')';
   const pad = '0.045*(sin(2*PI*' + chord(220, 174.61) + '*t)+sin(2*PI*' + chord(261.63, 220) + '*t)+sin(2*PI*' + chord(329.63, 261.63) + '*t))*(0.75+0.25*sin(2*PI*0.5*t))';
   const soft = '(min(1,mod(t,4)*4)*min(1,(4-mod(t,4))*4))';
