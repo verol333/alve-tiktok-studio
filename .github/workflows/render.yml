@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji > /dev/null
       - name: Reconnaissance vocale (calage des sous-titres)
         run: pip install -q faster-whisper
       - run: npm install --no-audit --no-fund
