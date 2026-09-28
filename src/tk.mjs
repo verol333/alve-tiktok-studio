@@ -82,8 +82,12 @@ function bg(ctx, env, s, t, acc) {
   const off = (t * 0.9) % 1;
   for (let j = 0; j < 14; j++) { const d = (j + off) / 14, y = hor + (H - hor) * d * d; ctx.globalAlpha = d; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
   ctx.restore();
-  const fade = ctx.createLinearGradient(0, hor - 40, 0, hor + 220); fade.addColorStop(0, '#0A1122'); fade.addColorStop(1, 'rgba(10,17,34,0)'); ctx.fillStyle = fade; ctx.fillRect(0, hor - 40, W, 260);
+  const fade = ctx.createLinearGradient(0, hor - 40, 0, hor + 220); fade.addColorStop(0, V[1]); fade.addColorStop(1, rgba(V[1], 0)); ctx.fillStyle = fade; ctx.fillRect(0, hor - 40, W, 260);
   for (const p of env.particles || []) { const y = (p.y - t * p.v * 1.6) % H; ctx.fillStyle = rgba(acc, p.a); ctx.fillRect(p.x, y < 0 ? y + H : y, p.s, p.s); }
+  { const CH = ['2-2', '10', '1-1', '7.5', '3-3', '8.5', '1.72', '0-2']; ctx.save(); font(ctx, 44, env.F.xb); ctx.textAlign = 'center';
+    CH.forEach((c, i) => { const x = (i * 173 + 90) % W, y = ((i * 311 + 200 - t * (30 + i * 6)) % (H + 200) + H + 200) % (H + 200) - 100, w = ctx.measureText(c).width + 50;
+      ctx.globalAlpha = 0.09 + 0.05 * Math.sin(t + i); ctx.fillStyle = acc; rr(ctx, x - w / 2, y - 40, w, 64, 32); ctx.fill(); ctx.globalAlpha = 0.22; ctx.fillStyle = '#FFFFFF'; ctx.fillText(c, x, y + 8); });
+    ctx.restore(); }
   const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.7)'); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
 }
 
@@ -156,7 +160,8 @@ export const TK = {
       ctx.fillStyle = 'rgba(255,255,255,0.06)'; rr(ctx, -440, -90, 880, 170, 30); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 3; ctx.stroke();
       const fs = fit(ctx, it.label, 96, 50, 700, env.F.black); text(ctx, it.label, 0, fs * 0.33, fs, env.F.black, '#FFFFFF');
       const sp = easeOut(prog(lt, at + 0.3, 0.22));
-      if (sp > 0) { ctx.strokeStyle = A.red; ctx.lineWidth = 18; ctx.lineCap = 'round'; ctx.shadowColor = rgba(A.red, 0.9); ctx.shadowBlur = 24; ctx.beginPath(); ctx.moveTo(-400, 10); ctx.lineTo(-400 + 800 * sp, -14); ctx.stroke(); ctx.shadowBlur = 0;
+      if (sp > 0 && it.ok) { ctx.fillStyle = A.acc; ctx.beginPath(); ctx.arc(390, -80, 44 * easeBack(sp), 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#04140D'; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(370, -80); ctx.lineTo(386, -64); ctx.lineTo(412, -96); ctx.stroke(); }
+      else if (sp > 0) { ctx.strokeStyle = A.red; ctx.lineWidth = 18; ctx.lineCap = 'round'; ctx.shadowColor = rgba(A.red, 0.9); ctx.shadowBlur = 24; ctx.beginPath(); ctx.moveTo(-400, 10); ctx.lineTo(-400 + 800 * sp, -14); ctx.stroke(); ctx.shadowBlur = 0;
         ctx.fillStyle = A.red; ctx.beginPath(); ctx.arc(390, -80, 44 * easeBack(sp), 0, Math.PI * 2); ctx.fill(); text(ctx, '✕', 390, -62, 54, env.F.xb, '#FFFFFF'); }
       ctx.restore();
     });
