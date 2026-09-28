@@ -735,7 +735,7 @@ export async function runLong(job, DIR) {
   const spec = { vertical: (job.style || {}).format === 'vertical', F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes), look };
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
-  await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total);
+  await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total, (job.style || {}).music_cues || [], tl);
   await mixAudio(DIR, tl, vo.files, events(tl, Object.assign(env, { look, logo: null })), audio);
   await run('ffmpeg', ['-y', '-i', video, '-i', audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', final]);
   const { out } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', final]);
