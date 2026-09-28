@@ -42,6 +42,31 @@ export function drawStrategy(ctx, env, s, lt) {
       label(ctx, result, cx, 636, 62, env.F.xb, color); ctx.restore();
     });
     label(ctx, 'Différents scores · un seul marché à vérifier', 960, 840, 46, env.F.xb, AMBER);
+  } else if (mode === 'verify') {
+    const first = easeOut(prog(lt, .2, .6)), second = easeOut(prog(lt, Math.max(1.1, s.voiceDur * .42), .65));
+    panel(ctx, 150, 345, 710, 430, AMBER); panel(ctx, 1060, 345, 710, 430, GREEN);
+    ctx.save(); ctx.globalAlpha = Math.max(.05, first);
+    label(ctx, 'SCORE EXACT 2-2', 505, 420, 32, env.F.xb, AMBER);
+    label(ctx, '≤ 10,00', 505, 570, 126, env.F.display);
+    label(ctx, 'Premier filtre', 505, 685, 38, env.F.sb, MUTED); ctx.restore();
+    ctx.save(); ctx.globalAlpha = Math.max(.05, second);
+    label(ctx, 'LES DEUX MARQUENT · OUI', 1415, 420, 30, env.F.xb, GREEN);
+    label(ctx, '≤ 1,60', 1415, 570, 126, env.F.display);
+    label(ctx, 'Vérification obligatoire', 1415, 685, 35, env.F.sb, MUTED); ctx.restore();
+    const q = easeOut(prog(lt, Math.max(1.4, s.voiceDur * .56), .65));
+    ctx.strokeStyle = GREEN; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(960, 565, 63, -Math.PI/2, -Math.PI/2 + q*Math.PI*2); ctx.stroke();
+    if (q > .95) label(ctx, '+', 960, 564, 81, env.F.display, WHITE);
+    label(ctx, 'Deux conditions ensemble · aucune garantie', 960, 865, 43, env.F.xb, AMBER);
+  } else if (mode === 'decision') {
+    const q = easeOut(prog(lt, .2, .55));
+    panel(ctx, 245, 337, 1430, 495, GREEN);
+    label(ctx, '2-2 ≤ 10,00', 545, 464, 77, env.F.display, AMBER);
+    label(ctx, 'ET', 960, 465, 58, env.F.display, WHITE);
+    label(ctx, 'OUI ≤ 1,60', 1380, 465, 77, env.F.display, GREEN);
+    ctx.fillStyle = GREEN; ctx.fillRect(510, 542, 900 * q, 9);
+    if(q > .05){ctx.beginPath();ctx.moveTo(1450,547);ctx.lineTo(1405,520);ctx.lineTo(1405,574);ctx.fill();}
+    ctx.save();ctx.globalAlpha = q;label(ctx, 'Les deux équipes marquent : OUI', 960, 690, 66, env.F.xb);ctx.restore();
+    label(ctx, 'La méthode sélectionne, elle ne garantit pas', 960, 880, 39, env.F.sb, MUTED);
   } else {
     panel(ctx, 170, 335, 1580, 460, GREEN);
     label(ctx, 'COTE DU SCORE EXACT 2-2', 960, 412, 42, env.F.xb, MUTED);
