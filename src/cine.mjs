@@ -43,20 +43,11 @@ function blobs(ctx, s, t, alpha, base) {
 function bgMesh(ctx, s, t) {
   ctx.fillStyle = '#070A14'; ctx.fillRect(0, 0, W, H);
   blobs(ctx, s, t, 0.3);
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
-  const off = (t * 24) % 80;
-  ctx.beginPath();
-  for (let x = off - 80; x < W; x += 80) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
-  for (let y = off - 80; y < H; y += 80) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
-  ctx.stroke();
   vignette(ctx, 0.6);
 }
 function bgLight(ctx, s, t) {
   ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
   blobs(ctx, s, t, 0.16);
-  ctx.fillStyle = 'rgba(11,16,32,0.07)';
-  const off = (t * 12) % 48;
-  for (let y = off - 48; y < H; y += 48) for (let x = 24; x < W; x += 48) ctx.fillRect(x, y, 3, 3);
 }
 function bgBroll(ctx, env, s, lt, t) {
   const f = env.brollFrame;
