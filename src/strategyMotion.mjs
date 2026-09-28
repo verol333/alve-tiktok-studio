@@ -8,6 +8,34 @@ function panel(ctx, x, y, w, h, border) {
   ctx.fillStyle = '#1A2940'; rr(ctx, x, y, w, h, 30); ctx.fill();
   ctx.strokeStyle = border; ctx.lineWidth = 4; ctx.stroke();
 }
+// A genuine bookmaker capture, shown in a phone and enlarged without recreating its odds.
+function drawEvidence(ctx, env, s, lt) {
+  const shot = env.imgs?.[s.look.shot];
+  if (!shot) throw new Error('Capture Norvège–Portugal introuvable');
+  const p = easeOut(prog(lt, .15, .6));
+  label(ctx, 'NORVÈGE  ·  PORTUGAL', 1320, 137, 42, env.F.xb, WHITE);
+  label(ctx, 'LA COTE DU 2-2 SUR LA VRAIE CAPTURE', 1320, 202, 43, env.F.display, AMBER);
+  ctx.save(); ctx.globalAlpha = p;
+  ctx.fillStyle = '#050A13'; rr(ctx, 165, 38, 462, 1002, 54); ctx.fill();
+  ctx.save(); rr(ctx, 181, 54, 430, 970, 35); ctx.clip();
+  ctx.drawImage(shot, 181, 54, 430, 970);
+  ctx.restore();
+  ctx.strokeStyle = '#697B90'; ctx.lineWidth = 5; rr(ctx, 165, 38, 462, 1002, 54); ctx.stroke();
+  // Original centre card: screenshot pixel region (440,1450)-(840,1667).
+  const z = easeOut(prog(lt, .8, .55));
+  ctx.globalAlpha = z;
+  panel(ctx, 772, 328, 1050, 548, GREEN);
+  ctx.save(); rr(ctx, 795, 351, 1004, 502, 22); ctx.clip();
+  ctx.drawImage(shot, 420, 1435, 440, 220, 795, 351, 1004, 502);
+  ctx.restore();
+  ctx.strokeStyle = AMBER; ctx.lineWidth = 11; ctx.lineCap = 'round';
+  const ring = easeOut(prog(lt, 1.6, .7));
+  ctx.beginPath(); ctx.ellipse(1602, 600, 97, 68, -.13, -Math.PI/2, -Math.PI/2 + Math.PI * 2 * ring); ctx.stroke();
+  ctx.restore();
+  label(ctx, '2-2  ·  COTE 10', 1285, 947, 54, env.F.xb, GREEN);
+  label(ctx, 'Cote du OUI absente de cette image', 1290, 1004, 32, env.F.sb, MUTED);
+}
+
 export function drawStrategy(ctx, env, s, lt) {
   const L = s.look, mode = L.mode || 'score';
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -18,6 +46,7 @@ export function drawStrategy(ctx, env, s, lt) {
   a.addColorStop(0, 'rgba(61,225,171,.2)'); a.addColorStop(1, 'rgba(61,225,171,0)');
   ctx.fillStyle = a; ctx.fillRect(600, 0, 1300, H);
   const p = easeOut(prog(lt, 0, .32));
+  if (mode === 'evidence') { drawEvidence(ctx, env, s, lt); return { subs: false, light: false }; }
   label(ctx, L.kicker || 'LA MÉTHODE', 960, 122, 29, env.F.xb, GREEN);
   label(ctx, L.headline || 'Décoder le score exact', 960, 215, 68, env.F.display);
   ctx.fillStyle = GREEN; ctx.fillRect(870, 263, 180 * p, 6);
