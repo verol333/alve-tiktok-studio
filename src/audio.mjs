@@ -69,7 +69,26 @@ export function sfxEvents(tl, env) {
 }
 
 // Vraie musique de fond (bibliothèque libre de droits), bouclée sur toute la vidéo.
-export async function libraryMusic(dir, url, total) {
+export async function libraryMusic(dir, url, total, cues = [], timeline = null) {
+  if (timeline && cues.length > 1) {
+    try {
+      const ordered = cues.map(c => ({...c, at: timeline.scenes[c.scene]?.start ?? 0})).sort((a,b) => a.at - b.at);
+      const parts = [];
+      for (let i = 0; i < ordered.length; i++) {
+        const c = ordered[i], length = Math.max(.3, (ordered[i + 1]?.at ?? total) - c.at);
+        const src = join(dir, 'music_source_' + i + '.mp3'), dst = join(dir, 'music_part_' + i + '.wav');
+        await download(c.url, src);
+        const vol = Math.max(.12, Math.min(.45, Number(c.volume) || .28));
+        const fade = Math.min(.7, length / 4);
+        await run('ffmpeg', ['-y', '-stream_loop', '-1', '-i', src, '-t', String(length), '-af', 'volume=' + vol + ',afade=t=in:d=' + fade + ',afade=t=out:st=' + Math.max(0,length-fade) + ':d=' + fade, '-ar', '44100', '-ac', '2', dst]);
+        parts.push({dst, at:c.at});
+      }
+      const args = ['-y']; parts.forEach(p => args.push('-i', p.dst));
+      const graph = parts.map((p,i)=>'['+i+':a]adelay=delays='+Math.round(p.at*1000)+':all=1[m'+i+']').join(';')+';'+parts.map((_,i)=>'[m'+i+']').join('')+'amix=inputs='+parts.length+':normalize=0:duration=longest[out]';
+      await run('ffmpeg', args.concat(['-filter_complex',graph,'-map','[out]','-t',String(total+1),'-ar','44100','-ac','2',join(dir,'music.wav')]));
+      console.log('Musique : ambiances alternées par séquence'); return true;
+    } catch (e) { console.error('Ambiances alternées indisponibles : ' + String(e.message || e).slice(0,150)); }
+  }
   if (!url) return false;
   try {
     const mp3 = join(dir, 'music_src.mp3');
