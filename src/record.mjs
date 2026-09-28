@@ -176,7 +176,7 @@ async function act(page, a, mark) {
       await link.click();
     } else {
       console.log('Site absent des résultats Google : adresse ouverte directement, aucun faux résultat.');
-      await page.goto(job.site_url + '/', { waitUntil: 'load', timeout: 60000 });
+      await page.goto('https://al-ve-pro.base44.app/', { waitUntil: 'load', timeout: 60000 });
     }
     await wait(a.wait || 500); return;
   }

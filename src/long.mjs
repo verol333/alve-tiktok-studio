@@ -27,6 +27,7 @@ import { alignScenes } from './align.mjs';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from './draw.mjs';
 import { prepCuts, drawCut, cutSfx } from './longFx.mjs';
 import { TK, tkCaption, tkSfx } from './tk.mjs';
+import { drawStrategy } from './strategyMotion.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
 const P = { a: '#33D98E', b: '#818CF8', d1: '#0A0F1E', d2: '#1C2336', ink: '#E7ECFB', mute: '#9AA4C6' };
@@ -421,7 +422,7 @@ function drawFrameV(ctx, env, tl, i, t) {
     finishFx(ctx, s, lt);
     return;
   }
-  const look = s.look && LOOKS[s.look.type];
+  const look = s.look && (LOOKS[s.look.type] || (s.look.type === 'strategy' ? drawStrategy : null));
   if (look) {
     stageV(ctx, KV[s.look.type] || 0.72, s.look.type === 'kinetic' ? 960 : 900);
     const r = look(ctx, env, s, lt, t) || {};
@@ -467,7 +468,7 @@ function drawFrameV(ctx, env, tl, i, t) {
 function drawFrame(ctx, env, tl, i, t) {
   if (VERT) return drawFrameV(ctx, env, tl, i, t);
   const s = tl.scenes[i];
-  const look = s.look && LOOKS[s.look.type];
+  const look = s.look && (LOOKS[s.look.type] || (s.look.type === 'strategy' ? drawStrategy : null));
   if (look) {
     const lt = t - s.start;
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
