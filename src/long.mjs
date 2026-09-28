@@ -28,6 +28,7 @@ import { clamp, prog, easeOut, easeBack, rgba, rr, font, fitLines, seeded } from
 import { prepCuts, drawCut, cutSfx } from './longFx.mjs';
 import { TK, tkCaption, tkSfx } from './tk.mjs';
 import { drawStrategy } from './strategyMotion.mjs';
+import { drawSubsPro, emojiUrls, subsSfx } from './subsFx.mjs';
 
 const W = 1920, H = 1080, FPS = 30;
 const P = { a: '#33D98E', b: '#818CF8', d1: '#0A0F1E', d2: '#1C2336', ink: '#E7ECFB', mute: '#9AA4C6' };
@@ -289,6 +290,7 @@ function groups(s) {
 
 function drawSubs(ctx, env, s, t, cx) {
   if (!s.words.length) return;
+  return drawSubsPro(ctx, env, s, t, cx, cx === W / 2 ? W - 260 : COL.w, (env.look && env.look.accent) || accentOf(s), P.ink, env.F.kin || env.F.xb);
   const p = (t - s.voiceAt) / s.voiceDur;
   if (p < 0 || p > 1.03) return;
   let cur = s.words.findIndex((w) => p < w.end);
@@ -608,6 +610,7 @@ function events(tl, env) {
   tl.scenes.forEach((s) => {
     if (s.look) for (const [name, at, vol] of lookSfx(s)) ev.push({ name, at: s.start + at, vol });
     if (s.look) for (const [name, at, vol] of tkSfx(s)) ev.push({ name, at: s.start + at, vol });
+    if (!VERT) ev.push(...subsSfx(s));
     if (s.kind === 'intro') ev.push({ name: 'impact', at: 0.3, vol: 0.8 });
     if (s.kind === 'chapter') ev.push({ name: 'rise', at: s.start - 0.4, vol: 0.3 }, { name: 'impact', at: s.start + 0.35, vol: 0.55 });
     if (s.kind === 'point') ev.push({ name: 'whoosh', at: s.start - 0.08, vol: 0.35 });
@@ -732,7 +735,7 @@ export async function runLong(job, DIR) {
   console.log('Plans d’illustration : ' + Object.keys(brolls).length + ' / ' + urls.length);
   for (const s of tl.scenes) if (s.kind === 'chapter') { env.chapters[s.chapter] = s.title; env.marks.push(s.start / tl.total); }
   const video = join(DIR, 'video.mp4'), audio = join(DIR, 'audio.m4a'), final = join(DIR, 'final.mp4');
-  const spec = { vertical: (job.style || {}).format === 'vertical', F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes), look };
+  const spec = { vertical: (job.style || {}).format === 'vertical', F, walk: walk.file, total: tl.total, chapters: env.chapters, marks: env.marks, raw, bg: (job.backgrounds || [])[0], logo: logoUrl, brolls, brollDur, imgs: lookImages(tl.scenes).concat(emojiUrls(tl.scenes)), look };
   await render(spec, tl, video, DIR);
   await makeSfx(DIR, tl.total);
   await libraryMusic(DIR, job.music_url || (job.style || {}).music_url, tl.total, (job.style || {}).music_cues || [], tl);
