@@ -574,6 +574,45 @@ export const LOOKS = {
     return { subs: true };
   },
 
+  ladder(ctx, env, s, lt, t) {
+    const L = s.look; bgMesh(ctx, s, t);
+    const acc = hue(s)[0], rows = L.steps || [], n = Math.max(1, rows.length), lost = L.lost_at == null ? -1 : L.lost_at;
+    const t0 = T(s, L.from == null ? 0.08 : L.from), t1 = T(s, L.end == null ? 0.8 : L.end), st = Math.max(0.2, (t1 - t0) / n);
+    const lim = lost >= 0 ? lost + 1 : n, pc = clamp((lt - t0) / st, 0, lim), cur = Math.min(lim - 1, Math.floor(pc)), k = pc - Math.floor(pc);
+    const a = easeOut(prog(lt, 0, 0.5)), x0 = 230, y0 = 960, gw = W - 460, sw = gw / n, sh = 470 / n;
+    const cz = 1 + 0.08 * easeOut(clamp(pc / n, 0, 1)), fx = x0 + sw * (cur + 0.5), fy = y0 - sh * (cur + 1);
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.translate(W / 2, H / 2); ctx.scale(cz, cz); ctx.translate(-W / 2 + (W / 2 - fx) * (cz - 1), -H / 2 + (H / 2 - fy) * (cz - 1));
+    for (let i = 0; i < lim; i++) {
+      const at = t0 + i * st, p = easeBack(prog(lt, at, 0.45));
+      if (p <= 0) continue;
+      const bh = sh * (i + 1) * clamp(p, 0, 1.15), x = x0 + i * sw + 8, w = sw - 16, y = y0 - bh;
+      const red = i === lost && lt >= at + st * 0.6, col = red ? RED : acc;
+      ctx.fillStyle = rgba(col, 0.2); rr(ctx, x, y, w, bh, 14); ctx.fill();
+      ctx.fillStyle = col; rr(ctx, x, y, w, 12, 6); ctx.fill();
+      ctx.save(); ctx.globalAlpha *= clamp(p, 0, 1);
+      txt(ctx, 'PALIER ' + (i + 1), x + w / 2, y0 - 22, Math.min(30, w / 5), env.F.xb, MUTE_L);
+      if (rows[i]) {
+        txt(ctx, 'x' + fr(rows[i].odd), x + w / 2, y - 22, Math.min(46, w / 3.4), env.F.display, col);
+        if (bh > 110) txt(ctx, money(rows[i].cap), x + w / 2, y + 62, Math.min(40, w / 4.2), env.F.xb, '#FFFFFF');
+      }
+      ctx.restore();
+    }
+    const bob = Math.sin(t * 6) * 8, tx = x0 + sw * (cur + 0.5), ty = y0 - sh * (cur + 1) * clamp(easeOut(prog(lt, t0 + cur * st, 0.45)), 0, 1) - 60 + bob;
+    if (lt >= t0) { ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(tx, ty, 22, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = acc; ctx.beginPath(); ctx.arc(tx, ty, 13, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    const prev = cur > 0 && rows[cur - 1] ? rows[cur - 1].cap : (L.start || 0), goal = rows[cur] ? rows[cur].cap : prev;
+    const val = lt < t0 ? (L.start || 0) : (cur === lost && lt >= t0 + cur * st + st * 0.6 ? 0 : prev + (goal - prev) * easeOut(clamp(k * 1.6, 0, 1)));
+    ctx.save(); ctx.globalAlpha *= a;
+    txt(ctx, L.kicker || 'LA MONTANTE', W / 2, 120, 32, env.F.xb, acc);
+    ctx.fillStyle = acc; ctx.fillRect(W / 2 - 70 * a, 142, 140 * a, 5);
+    txt(ctx, money(val) + ' ' + (L.currency || 'F'), W / 2, 250, 110, env.F.display, '#FFFFFF');
+    ctx.restore();
+    if (lost >= 0) stamp(ctx, env, L.lost_label || 'PERDU', W / 2, H / 2 + 40, lt, t0 + lost * st + st * 0.6, RED);
+    else if (L.stamp) stamp(ctx, env, L.stamp, W / 2, H / 2 + 40, lt, t1 + 0.25, acc);
+    return { subs: true };
+  },
+
   books(ctx, env, s, lt, t) {
     const L = s.look; bgMesh(ctx, s, t);
     const list = L.logos || [], acc = hue(s)[0];
@@ -726,6 +765,7 @@ export function lookSfx(s) {
   if (L.type === 'split') { const at = L.at || []; out.push(['whoosh', T(s, at[0] || 0), 0.3]); [1, 2, 3, 4].forEach((i) => at[i] != null && out.push(['pop', T(s, at[i]), 0.35])); if (at[5] != null) out.push(['ding', T(s, at[5]), 0.5]); }
   if (L.type === 'stack') { const n = (L.rows || []).length, t0 = T(s, 0.04), t1 = T(s, L.end == null ? 0.85 : L.end), st = n ? Math.max(0.05, (t1 - t0) / n) : 1; out.push(['whoosh', 0, 0.35]); for (let i = 0; i < n; i++) out.push(['pop', t0 + i * st, 0.16]); out.push(['ding', t1 + 0.1, 0.55]); }
   if (L.type === 'markets') { out.push(['whoosh', 0, 0.3]); const n = (L.items || []).length, st = Math.min(0.28, (s.voiceDur * 0.55) / Math.max(1, n)); for (let i = 0; i < n; i += 2) out.push(['pop', T(s, 0.05) + i * st, 0.25]); if ((L.items || []).some((x) => x.on)) out.push(['ding', T(s, L.on_at == null ? 0.6 : L.on_at), 0.45]); }
+  if (L.type === 'ladder') { const n = Math.max(1, (L.steps || []).length), lost = L.lost_at == null ? -1 : L.lost_at, t0 = T(s, L.from == null ? 0.08 : L.from), t1 = T(s, L.end == null ? 0.8 : L.end), st = Math.max(0.2, (t1 - t0) / n); out.push(['whoosh', 0, 0.35]); for (let i = 0; i < (lost >= 0 ? lost + 1 : n); i++) out.push(['pop', t0 + i * st, 0.3], ['rise', t0 + i * st, 0.12]); if (lost >= 0) out.push(['impact', t0 + lost * st + st * 0.6, 0.9]); else if (L.stamp) out.push(['impact', t1 + 0.25, 0.8], ['ding', t1 + 0.4, 0.55]); }
   if (L.type === 'bigstat') out.push(['rise', 0, 0.3], ['ding', T(s, 0.02) + 1.2, 0.55]);
   if (L.type === 'books') { out.push(['whoosh', 0, 0.3]); const n = (L.logos || []).length, st = booksStep(s, n); for (let i = 0; i < n; i += 2) out.push(['pop', T(s, 0.06) + i * st, 0.28]); }
   if (L.type === 'mail') out.push(['whoosh', T(s, 0.05), 0.35], ['ding', T(s, 0.05) + 0.5, 0.35], ['keys', T(s, 0.45), 0.35], ['ding', T(s, 0.8), 0.5]);
