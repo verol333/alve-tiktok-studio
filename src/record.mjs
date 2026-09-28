@@ -168,6 +168,18 @@ async function act(page, a, mark) {
   }
   // Attend qu'un élément apparaisse (hors champ si suivi d'un « restart »).
   if (a.waitFor) { await locate(page, { ...a.waitFor, timeout: a.waitFor.timeout || 45000 }); await wait(a.wait || 300); return; }
+  if (a.searchSite) {
+    const link = page.locator('a[href*=base44.app]').first();
+    if (await link.isVisible().catch(() => false)) {
+      const box = await bring(page, link);
+      await moveTo(page, box.x + box.width / 2, box.y + box.height / 2, 350);
+      await link.click();
+    } else {
+      console.log('Site absent des résultats Google : adresse ouverte directement, aucun faux résultat.');
+      await page.goto(job.site_url + '/', { waitUntil: 'load', timeout: 60000 });
+    }
+    await wait(a.wait || 500); return;
+  }
   if (a.press) { await page.keyboard.press(a.press); await wait(a.wait || 900); return; }
   // Centre l'élément à l'écran (y compris dans un panneau qui défile), curseur dessus.
   if (a.center) {
@@ -224,10 +236,13 @@ export async function recordWalkthrough(job, dir, plan) {
     for (const [s, i] of list) {
       const w = s.walk;
       try {
-        if (w.path) {
-          await page.goto(job.site_url + w.path, { waitUntil: 'load', timeout: 60000 });
+        if (w.path || w.google) {
+          await page.evaluate((pub) => { window.name = pub ? 'studio_public' : ''; }, !!w.public);
+          const target = w.google ? 'https://www.google.com/search?q=AL+VE+CAPITAL+site%3Aal-ve-pro.base44.app' : job.site_url + w.path;
+          await page.goto(target, { waitUntil: 'load', timeout: 60000 });
+          if (w.google) await page.evaluate(() => { window.name = 'studio_public'; });
           await wait(w.wait || 6000);
-          if (!w.public && !(await page.$('nav[aria-label="Navigation mobile"]'))) throw Object.assign(new Error('Session du site expirée : ouvrez l’application en administrateur puis relancez la vidéo'), { fatal: true });
+          if (!w.public && !w.google && !(await page.$('nav[aria-label="Navigation mobile"]'))) throw Object.assign(new Error('Session du site expirée : ouvrez l’application en administrateur puis relancez la vidéo'), { fatal: true });
           await closeInvites(page); await wait(300);
         }
         const seg = { start: now(), ev: [] };

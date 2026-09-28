@@ -14,7 +14,7 @@ import { api, download } from './api.mjs';
 import { run, duration } from './sh.mjs';
 import { loadFonts, loadImg, loadLookFont } from './assets.mjs';
 import { buildTimeline } from './timeline.mjs';
-import { makeSfx, mixAudio, libraryMusic } from './audio.mjs';
+import { makeSfx, mixAudio, libraryMusic, tightVoice } from './audio.mjs';
 import { cloneVoices } from './clone.mjs';
 import { captureScreens, screenKey } from './capture.mjs';
 import { loadShots, screenState, drawPhone, stepTimes, PH } from './phone.mjs';
@@ -659,9 +659,10 @@ export async function voices(job, DIR) {
   for (const [i, s] of job.scenes.entries()) {
     const f = join(DIR, 'v' + i + '.mp3');
     await download(s.audio_url, f);
-    const d = await duration(f);
+    const clean = await tightVoice(f, join(DIR, 'vc' + i + '.wav'));
+    const d = await duration(clean);
     if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
-    files.push(f); durs.push(d);
+    files.push(clean); durs.push(d);
   }
   console.log('Voix Henri : ' + files.length + ' scènes');
   return { files, durs, voice: 'henri' };
@@ -698,7 +699,7 @@ export async function runLong(job, DIR) {
   // 2) La voix d'abord : le parcours est ensuite filmé au rythme exact de chaque mot.
   const vo = await voices(job, DIR);
   const tl = buildTimeline(job.scenes, vo.durs, true);
-  await alignScenes(tl, vo.files, DIR);
+  await alignScenes(tl, vo.files, DIR, true);
   const nw = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   const plan = {};
   tl.scenes.forEach((s, i) => { if (s.walk) plan[i] = { dur: s.dur, words: (s.words || []).map((w) => ({ n: nw(w.text), t: (s.voiceAt - s.start) + w.start * s.voiceDur })) }; });

@@ -1,15 +1,15 @@
 // Minutage : chaque scène dure exactement le temps de sa voix (+ respiration).
-export function buildTimeline(scenes, durs, tight = false) {
-  tight = true; // vidéo rythmée : plus de longs blancs entre les scènes
+export function buildTimeline(scenes, durs, narrated = false) {
+  const tight = true; // vidéo rythmée : plus de longs blancs entre les scènes
   let t = 0; const out = [];
   scenes.forEach((s, i) => {
     // Respiration entre deux scènes (~1,5 s au total) pour laisser comprendre.
-    const lead = i === 0 ? 0.1 : tight ? 0.12 : 0.35;
+    const lead = i === 0 ? 0.04 : tight ? 0.08 : 0.35;
     const TAIL = { hook: 1.2, match: 1.2, pick: 1.3, combo: 1.4, results: 1.1, outro: 1.6 };
     const tail = TAIL[s.kind] != null ? TAIL[s.kind] : 1.0;
     // Vidéo longue : jamais plus d'une seconde sans voix entre deux scènes.
-    const dur = lead + durs[i] + (tight ? Math.min(tail, s.kind === 'outro' ? 1.2 : s.kind === 'chapter' ? 0.7 : 0.45) : tail);
-    const words = String(s.text || '').split(/[ \t\n\r]+/).filter(Boolean);
+    const dur = lead + durs[i] + (tight ? Math.min(tail, s.kind === 'outro' ? 0.65 : 0.22) : tail);
+    const words = String((narrated && s.voice) || s.text || '').split(/[ \t\n\r]+/).filter(Boolean);
     const weights = words.map((w) => w.length + 3);
     const sum = weights.reduce((a, b) => a + b, 0) || 1;
     let acc = 0;

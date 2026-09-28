@@ -48,7 +48,7 @@ export function alignWords(text, ws, dur) {
   });
 }
 
-export async function alignScenes(tl, files, DIR) {
+export async function alignScenes(tl, files, DIR, narrated = false) {
   const inF = join(DIR, 'align-in.json'), outF = join(DIR, 'align-out.json');
   writeFileSync(inF, JSON.stringify(files.map((f, i) => ({ file: f, prompt: String(tl.scenes[i].voice || '').slice(0, 400) }))));
   try { await run('python', [fileURLToPath(new URL('./align.py', import.meta.url)), inF, outF]); }
@@ -56,7 +56,7 @@ export async function alignScenes(tl, files, DIR) {
   const res = JSON.parse(readFileSync(outF, 'utf8'));
   let ok = 0;
   tl.scenes.forEach((s, i) => {
-    const w = alignWords(s.text, res[i] || [], s.voiceDur);
+    const w = alignWords((narrated && s.voice) || s.text, res[i] || [], s.voiceDur);
     if (w) { s.words = w; s.aligned = true; ok++; }
   });
   console.log('Sous-titres calés sur la voix : ' + ok + ' / ' + tl.scenes.length + ' scènes');

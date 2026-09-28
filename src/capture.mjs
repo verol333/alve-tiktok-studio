@@ -14,7 +14,7 @@ export function initScript(tok) {
   try {
     const now = String(Date.now());
     // Pages publiques (accueil, inscription) : filmées comme un visiteur non connecté.
-    if (/^\/(login|landing-preview)/.test(location.pathname)) { localStorage.removeItem('base44_access_token'); localStorage.removeItem('token'); }
+    if (window.name === 'studio_public' || /^\/(login|landing-preview)/.test(location.pathname)) { localStorage.removeItem('base44_access_token'); localStorage.removeItem('token'); }
     else { localStorage.setItem('base44_access_token', tok); localStorage.setItem('token', tok); }
     for (const k of ['alve_pwa_dismissed_at', 'alve_push_v2_snooze', 'alve_tiktok_keepalive', 'alve_studio_access',
       'alve_invite_arb_prematch', 'alve_invite_arb_live', 'alve_invite_auto', 'alve_invite_mise_auto']) localStorage.setItem(k, now);
