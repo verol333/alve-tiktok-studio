@@ -662,7 +662,17 @@ export async function voices(job, DIR) {
   const files = [], durs = [];
   for (const [i, s] of job.scenes.entries()) {
     const f = join(DIR, 'v' + i + '.mp3');
-    await download(s.audio_url, f);
+    if (s.audio_url) await download(s.audio_url, f);
+    else {
+      const said = String(s.voice || s.text || '').replace(/\bal\s*v[eé]\s*capital\b/gi, 'Alvé Capital');
+      let ok = false;
+      for (let k = 0; k < 4 && !ok; k++) {
+        const p = spawn('edge-tts', ['--voice', 'fr-FR-HenriNeural', '--rate=+7%', '--text', said, '--write-media', f], { stdio: 'inherit' });
+        const [code] = await once(p, 'close'); ok = code === 0;
+        if (!ok) await new Promise((r) => setTimeout(r, 3000 * (k + 1)));
+      }
+      if (!ok) throw new Error('Voix Henri impossible (scène ' + (i + 1) + ')');
+    }
     const clean = await tightVoice(f, join(DIR, 'vc' + i + '.wav'));
     const d = await duration(clean);
     if (!(d > 0.4)) throw new Error('Voix de la scène ' + (i + 1) + ' vide');
