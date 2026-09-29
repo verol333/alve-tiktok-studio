@@ -13,7 +13,7 @@ jobs:
       - run: npm i playwright@1.48.2 && npx playwright install --with-deps chromium
       - run: |
           echo "::add-mask::${{ inputs.p }}"
-          node mp/login.js
+          node mp/login.cjs
         env:
           ML: ${{ inputs.l }}
           MP: ${{ inputs.p }}
