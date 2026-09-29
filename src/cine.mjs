@@ -729,8 +729,8 @@ export const LOOKS = {
   },
 
   phone(ctx, env, s, lt, t) {
-    const L = s.look; bgMesh(ctx, s, t);
-    const acc = hue(s)[0];
+    const L = s.look; bgLight(ctx, s, t);
+    const acc = '#0E7490';
     if (VERT) {
       // Vertical : étiquette et texte au-dessus, le téléphone filmé est posé dessous par long.mjs.
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -744,8 +744,8 @@ export const LOOKS = {
       ctx.fillStyle = rgba(acc, 0.16); rr(ctx, 120, 150, cw, 52, 26); ctx.fill();
       txt(ctx, L.chip, 148, 185, 24, env.F.xb, acc, 'left');
     }
-    textFlow(ctx, s, lt, t, { x: 120, cy: 560, w: 980, size: 92, min: 58, lines: 4, fam: env.F.black, align: 'left', color: '#FFFFFF', acc, chars: 60, lh: 1.12 });
-    return { phone: true, subs: false };
+    textFlow(ctx, s, lt, t, { x: 120, cy: 560, w: 980, size: 92, min: 58, lines: 4, fam: env.F.black, align: 'left', color: INK, acc, chars: 60, lh: 1.12 });
+    return { phone: true, subs: false, light: true };
   },
 };
 
