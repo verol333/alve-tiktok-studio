@@ -92,7 +92,7 @@ const LAY = {
       if (L.check) check(ctx, 0, 0, 30, prog(lt, at[i] + 0.3, 0.4), act ? '#FFFFFF' : c); else tx(ctx, String(i + 1), 0, 16, 44, env.F.display, act ? '#FFFFFF' : c);
       ctx.restore();
       tx(ctx, typeof x === 'string' ? x : x.t, 260, cy + 16, Math.min(50, rowH * 0.4), env.F.xb, INK, 'left', 1200);
-      if (x.sub) tx(ctx, x.sub, 1490, cy + 14, 36, env.F.display, c, 'right');
+      if (typeof x === 'object' && x.sub) tx(ctx, x.sub, 1490, cy + 14, 36, env.F.display, c, 'right');
       ctx.restore();
     });
   },
@@ -176,7 +176,7 @@ const LAY = {
       tx(ctx, String(i + 1), 0, 22, 64, env.F.display, '#FFFFFF'); ctx.restore();
       ctx.save(); ctx.globalAlpha *= clamp(q, 0, 1); ctx.translate(0, (1 - q) * 40);
       const lbl = typeof it[i] === 'string' ? it[i] : it[i].t; tx(ctx, lbl, x, y + 140, 40, env.F.xb, INK, 'center', gap - 30);
-      if (it[i].sub) tx(ctx, it[i].sub, x, y + 190, 30, env.F.sb, MUTE, 'center', gap - 30);
+      if (typeof it[i] === 'object' && it[i].sub) tx(ctx, it[i].sub, x, y + 190, 30, env.F.sb, MUTE, 'center', gap - 30);
       ctx.restore();
     }
   },
