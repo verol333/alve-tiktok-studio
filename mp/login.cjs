@@ -6,6 +6,7 @@ const { chromium } = require('playwright');
  list.push(...(await get('https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=http&proxy_format=protocolipport&format=text&country='+cc+'&timeout=10000')).split(/\s+/).filter(Boolean));
  try{const j=JSON.parse(await get('https://proxylist.geonode.com/api/proxy-list?limit=150&page=1&sort_by=lastChecked&sort_type=desc&protocols=http&country='+cc.split(',').join('%2C')));(j.data||[]).forEach(x=>list.push('http://'+x.ip+':'+x.port));}catch{}
  list=['http://102.213.84.244:8080','http://51.170.133.249:80','http://41.139.164.19:8080',...new Set(list)];
+ if(process.env.EXTRA_PX) list.unshift(...process.env.EXTRA_PX.split(','));
  console.log('PROXIES',list.length);
  const t0=Date.now();
  for(const px of list.slice(0,90)){
