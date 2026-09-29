@@ -22,7 +22,7 @@ const { chromium } = require('playwright');
    await p.waitForTimeout(5000);
    console.log('PX',px,'->',p.url());
    if(/block/.test(p.url())||!/mp\.pro|megapari/.test(p.url())){await b.close();continue;}
-   await p.locator('button:visible, a:visible').filter({hasText:/^\s*se connecter\s*$/i}).first().click({timeout:15000});
+   await p.locator('button:visible, a:visible').filter({hasText:/^\s*(se connecter|connexion)\s*$/i}).first().click({timeout:15000});
    await p.waitForTimeout(3000);
    const pw=p.locator('input[type=password]:visible').first();
    const box=pw.locator('xpath=ancestor::*[.//text()[contains(.,"souvenir")]][1]/..');
@@ -42,7 +42,7 @@ const { chromium } = require('playwright');
    console.log('TEXT_AFTER',txt);
    const ck=(await ctx.cookies()).map(c=>c.name);
    console.log('COOKIES',JSON.stringify(ck));
-   const logged=authOk||ck.includes('user_token')||/d[ée]p[ôo]t|solde|mon compte/i.test(txt)&&!/SE CONNECTER/.test(txt);
+   const logged=authOk||ck.includes('user_token')||/d[ée]p[ôo]t|solde|mon compte/i.test(txt)&&!/SE CONNECTER|CONNEXION/i.test(txt.slice(0,200));
    console.log(logged?'LOGIN_RESULT=SUCCESS':'LOGIN_RESULT=FAIL');
    await b.close();
    if(logged||authOk===false)break;
