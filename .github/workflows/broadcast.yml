@@ -1,0 +1,36 @@
+name: broadcast
+on:
+  workflow_dispatch:
+    inputs:
+      script_id:
+        required: true
+      token:
+        required: true
+      api:
+        required: true
+permissions:
+  contents: write
+jobs:
+  broadcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Masquer le jeton
+        run: echo "::add-mask::${{ inputs.token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-noto-color-emoji > /dev/null
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium > /dev/null
+      - name: Tournage
+        run: node src/broadcast.mjs
+        env:
+          SCRIPT_ID: ${{ inputs.script_id }}
+          JOB_TOKEN: ${{ inputs.token }}
+          API_URL: ${{ inputs.api }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
