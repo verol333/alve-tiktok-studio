@@ -18,7 +18,7 @@ const { chromium } = require('playwright');
    const p=await ctx.newPage();
    let authOk=null;
    p.on('response',async r=>{ if(/user\/auth|login/i.test(r.url())&&r.request().method()==='POST'){let t='';try{t=(await r.text()).slice(0,300)}catch{} console.log('RESP',r.status(),r.url(),t); if(r.status()===200&&!/error/i.test(t))authOk=true;} });
-   await p.goto('https://megapari.africa/fr',{waitUntil:'domcontentloaded',timeout:20000});
+   await p.goto('https://megapari.bet/fr',{waitUntil:'domcontentloaded',timeout:20000});
    await p.waitForTimeout(5000);
    console.log('PX',px,'->',p.url());
    if(/block/.test(p.url())||!/mp\.pro|megapari/.test(p.url())){await b.close();continue;}
