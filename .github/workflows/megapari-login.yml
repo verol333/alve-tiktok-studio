@@ -1,0 +1,22 @@
+name: megapari-login-test
+on:
+  workflow_dispatch:
+    inputs:
+      l: {required: true}
+      p: {required: true}
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm i playwright@1.48.2 && npx playwright install --with-deps chromium
+      - run: |
+          echo "::add-mask::${{ inputs.p }}"
+          node mp/login.js
+        env:
+          ML: ${{ inputs.l }}
+          MP: ${{ inputs.p }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: shots, path: "*.png"}
