@@ -17,18 +17,15 @@ const { chromium } = require('playwright');
    await p.goto('https://megapari.africa/fr',{waitUntil:'domcontentloaded',timeout:25000});
    await p.waitForTimeout(5000);
    console.log('PX',px,'->',p.url());
-   if(/block/.test(p.url())){await b.close();continue;}
-   await p.locator('button:visible, a:visible').filter({hasText:/connexion|se connecter/i}).first().click({timeout:15000});
-   const pw=p.locator('input[type=password]:visible').first(); await pw.waitFor({timeout:15000});
-   const form=pw.locator('xpath=ancestor::form[1]');
-   const tabs=await p.locator('[role=dialog] button:visible, [class*=modal] button:visible, [class*=auth] button:visible, [class*=login] button:visible').allInnerTexts();
-   console.log('TABS',JSON.stringify(tabs.slice(0,20)));
-   const sw=p.locator('button:visible, [role=tab]:visible, label:visible, span:visible').filter({hasText:/^\s*(e-?mail|id|e-mail \/ id|id \/ e-mail|email\/id|par e-mail|identifiant)/i}).first();
-   try{await sw.click({timeout:4000});await p.waitForTimeout(1500);console.log('SWITCHED')}catch(e){console.log('NOSWITCH')}
-   console.log('INPUTS',JSON.stringify(await form.locator('input:visible').evaluateAll(a=>a.map(i=>[i.type,i.name,i.placeholder]))));
-   await form.locator('input:not([type=password]):not([type=checkbox]):not([type=hidden]):visible').first().fill(process.env.ML);
-   await pw.fill(process.env.MP);
-   await form.locator('button:visible').filter({hasText:/connect/i}).first().click();
+   if(/block/.test(p.url())||!/mp\.pro/.test(p.url())){await b.close();continue;}
+   await p.locator('header button:visible, header a:visible, button:visible').filter({hasText:/^\s*se connecter\s*$/i}).first().click({timeout:15000});
+   await p.waitForTimeout(3000);
+   console.log('ALLINPUTS',JSON.stringify(await p.locator('input:visible').evaluateAll(a=>a.map(i=>[i.type,i.name,i.placeholder,i.closest('form')?.className?.slice(0,40)]))));
+   const lf=p.locator('form:visible').filter({hasText:/souvenir/i}).last();
+   const idIn=lf.locator('input:visible:not([type=password]):not([type=checkbox]):not([type=radio])').first();
+   await idIn.fill(process.env.ML);
+   await lf.locator('input[type=password]:visible').first().fill(process.env.MP);
+   await lf.locator('button:visible').filter({hasText:/connect/i}).last().click();
    await p.waitForTimeout(20000);
    await p.screenshot({path:'after.png'});
    console.log('TEXT_AFTER',(await p.innerText('body')).slice(0,300).replace(/\n/g,' | '));
