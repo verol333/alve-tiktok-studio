@@ -21,6 +21,12 @@ const { chromium } = require('playwright');
    await p.locator('header button:visible, header a:visible, button:visible').filter({hasText:/^\s*se connecter\s*$/i}).first().click({timeout:15000});
    await p.waitForTimeout(3000);
    console.log('ALLINPUTS',JSON.stringify(await p.locator('input:visible').evaluateAll(a=>a.map(i=>[i.type,i.name,i.placeholder,i.closest('form')?.className?.slice(0,40)]))));
+   const via=p.locator('form:visible').filter({hasText:/souvenir/i}).last().locator('xpath=..').locator('button:visible, a:visible');
+   console.log('VIA',JSON.stringify(await via.evaluateAll(a=>a.map(e=>[e.innerText.slice(0,20),e.getAttribute('title'),e.getAttribute('aria-label'),e.className.slice(0,60)]))));
+   const idBtn=via.filter({has:p.locator('[class*=mail], [class*=email], [class*=id]')}).first();
+   try{await idBtn.click({timeout:3000});console.log('IDCLICK1')}catch{ try{await p.locator('[class*=auth] [class*=mail]:visible, [class*=auth] [class*=email]:visible, [title*=mail i]:visible').first().click({timeout:3000});console.log('IDCLICK2')}catch{console.log('NOIDBTN')} }
+   await p.waitForTimeout(2000);
+   console.log('INPUTS2',JSON.stringify(await p.locator('input:visible').evaluateAll(a=>a.map(i=>[i.type,i.name,i.placeholder]))));
    const lf=p.locator('form:visible').filter({hasText:/souvenir/i}).last();
    const idIn=lf.locator('input:visible:not([type=password]):not([type=checkbox]):not([type=radio])').first();
    await idIn.fill(process.env.ML);
