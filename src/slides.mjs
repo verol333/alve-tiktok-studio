@@ -31,10 +31,18 @@ function check(ctx, x, y, r, p, color) {
 // Décor : papier clair, grille de points qui dérive, formes géométriques en mouvement,
 // et un volet de couleur qui balaie l'écran à l'entrée (transition de slide).
 function backdrop(ctx, s, lt, t, c) {
-  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = 'rgba(11,16,32,0.06)';
+  const v = (s.look && s.look.bg != null) ? s.look.bg : Math.abs(Math.round((s.start || 0) * 7)) % 4;
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  if (v === 1) { g.addColorStop(0, '#FFFFFF'); g.addColorStop(1, rgba(c, 0.10)); }
+  else if (v === 2) { g.addColorStop(0, rgba(c, 0.08)); g.addColorStop(1, '#F1F4FA'); }
+  else if (v === 3) { g.addColorStop(0, '#EEF2F8'); g.addColorStop(0.6, '#FFFFFF'); g.addColorStop(1, rgba(c, 0.07)); }
+  else { g.addColorStop(0, PAPER); g.addColorStop(1, PAPER); }
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   const off = (t * 18) % 48;
-  for (let x = -48; x < W + 48; x += 48) for (let y = -48; y < H + 48; y += 48) { ctx.beginPath(); ctx.arc(x + off, y + off * 0.5, 2, 0, 6.283); ctx.fill(); }
+  if (v === 1) { ctx.strokeStyle = rgba(c, 0.07); ctx.lineWidth = 3; for (let x = -H; x < W + H; x += 70) { ctx.beginPath(); ctx.moveTo(x + off, 0); ctx.lineTo(x + off - H, H); ctx.stroke(); } }
+  else if (v === 2) { ctx.strokeStyle = 'rgba(11,16,32,0.05)'; ctx.lineWidth = 2; for (let x = 0; x < W; x += 80) { ctx.beginPath(); ctx.moveTo(x + off % 80, 0); ctx.lineTo(x + off % 80, H); ctx.stroke(); } for (let y = 0; y < H; y += 80) { ctx.beginPath(); ctx.moveTo(0, y + off % 80); ctx.lineTo(W, y + off % 80); ctx.stroke(); } }
+  else if (v === 3) { ctx.strokeStyle = rgba(c, 0.09); ctx.lineWidth = 4; for (let k = 0; k < 5; k++) { ctx.beginPath(); for (let x = 0; x <= W; x += 40) { const y = H * (0.2 + k * 0.17) + Math.sin(x / 180 + t * 0.8 + k) * 26; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); } }
+  else { ctx.fillStyle = 'rgba(11,16,32,0.06)'; for (let x = -48; x < W + 48; x += 48) for (let y = -48; y < H + 48; y += 48) { ctx.beginPath(); ctx.arc(x + off, y + off * 0.5, 2, 0, 6.283); ctx.fill(); } }
   [[0.1, 0.85, 220, 0.5], [0.92, 0.18, 280, 0.35], [0.8, 0.9, 140, 0.7]].forEach(([fx, fy, r, sp], i) => {
     const x = W * fx + Math.sin(t * sp + i) * 40, y = H * fy + Math.cos(t * sp + i) * 30;
     ctx.fillStyle = rgba(c, 0.07 + i * 0.02); ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
