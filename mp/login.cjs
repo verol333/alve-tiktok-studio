@@ -5,6 +5,7 @@ const { chromium } = require('playwright');
  try{const t=await (await fetch('https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=http&proxy_format=protocolipport&format=text&country='+cc+'&timeout=8000')).text();list=t.split(/\s+/).filter(Boolean);}catch(e){console.log('LISTERR',e.message)}
  console.log('PROXIES',list.length);
  const t0=Date.now();
+ list=['http://102.213.84.244:8080',...list];
  for(const px of list.slice(0,40)){
   if(Date.now()-t0>300000)break;
   let b;
@@ -20,6 +21,11 @@ const { chromium } = require('playwright');
    await p.locator('button:visible, a:visible').filter({hasText:/connexion|se connecter/i}).first().click({timeout:15000});
    const pw=p.locator('input[type=password]:visible').first(); await pw.waitFor({timeout:15000});
    const form=pw.locator('xpath=ancestor::form[1]');
+   const tabs=await p.locator('[role=dialog] button:visible, [class*=modal] button:visible, [class*=auth] button:visible, [class*=login] button:visible').allInnerTexts();
+   console.log('TABS',JSON.stringify(tabs.slice(0,20)));
+   const sw=p.locator('button:visible, [role=tab]:visible, label:visible, span:visible').filter({hasText:/^\s*(e-?mail|id|e-mail \/ id|id \/ e-mail|email\/id|par e-mail|identifiant)/i}).first();
+   try{await sw.click({timeout:4000});await p.waitForTimeout(1500);console.log('SWITCHED')}catch(e){console.log('NOSWITCH')}
+   console.log('INPUTS',JSON.stringify(await form.locator('input:visible').evaluateAll(a=>a.map(i=>[i.type,i.name,i.placeholder]))));
    await form.locator('input:not([type=password]):not([type=checkbox]):not([type=hidden]):visible').first().fill(process.env.ML);
    await pw.fill(process.env.MP);
    await form.locator('button:visible').filter({hasText:/connect/i}).first().click();
