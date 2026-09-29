@@ -3,6 +3,7 @@
 // score, coupon, écran du site) + texte cinétique calé mot à mot sur la voix.
 import { createCanvas } from '@napi-rs/canvas';
 import { clamp, prog, easeOut, easeBack, rgba, rr, font } from './draw.mjs';
+import { drawSlide, slideSfx } from './slides.mjs';
 
 let W = 1920, H = 1080;
 // Format vertical (Reel 1080x1920) : les décors couvrent tout l'écran, le contenu
@@ -728,6 +729,8 @@ export const LOOKS = {
     return { subs: true };
   },
 
+  slide(ctx, env, s, lt, t) { return drawSlide(ctx, env, s, lt, t); },
+
   phone(ctx, env, s, lt, t) {
     const L = s.look; bgLight(ctx, s, t);
     const acc = '#0E7490';
@@ -752,6 +755,7 @@ export const LOOKS = {
 // Bruitages propres à chaque look : [nom, instant dans la scène, volume].
 export function lookSfx(s) {
   const L = s.look || {}, out = [];
+  if (L.type === 'slide') return slideSfx(s);
   if (L.flash) out.push(['impact', 0.02, 0.5]);
   if (L.type === 'kinetic' || L.type === 'phone') {
     if (L.type === 'kinetic') out.push(['whoosh', 0, 0.28]);
