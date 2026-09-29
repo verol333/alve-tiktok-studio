@@ -11,12 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm i playwright@1.48.2 && npx playwright install --with-deps chromium
+      - name: Relais gratuits WARP + Tor
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq tor >/dev/null
+          sudo sh -c 'printf "SocksPort 9050\nExitNodes {za},{ke},{ng},{eg},{ma},{tn},{gh},{ci},{sn},{cm}\nStrictNodes 0\n" > /etc/tor/torrc' && sudo systemctl restart tor || true
+          curl -sL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.22/wgcf_2.2.22_linux_amd64 && chmod +x wgcf
+          curl -sL https://github.com/pufferffish/wireproxy/releases/download/v1.0.9/wireproxy_linux_amd64.tar.gz | tar xz
+          ./wgcf register --accept-tos && ./wgcf generate
+          printf "WGConfig = wgcf-profile.conf\n[Socks5]\nBindAddress = 127.0.0.1:25344\n" > wp.conf
+          (./wireproxy -c wp.conf > wp.log 2>&1 &) ; sleep 25
+          echo "WARP IP: $(curl -s -m 15 --socks5-hostname 127.0.0.1:25344 https://ipinfo.io/country)"
+          echo "TOR IP: $(curl -s -m 30 --socks5-hostname 127.0.0.1:9050 https://ipinfo.io/country)"
       - run: |
           echo "::add-mask::${{ inputs.p }}"
           node mp/login.cjs
         env:
           ML: ${{ inputs.l }}
           MP: ${{ inputs.p }}
+          EXTRA_PX: socks5://127.0.0.1:25344,socks5://127.0.0.1:9050
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: shots, path: "*.png"}
