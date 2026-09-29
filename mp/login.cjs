@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
  const ctx=await b.newContext({locale:'fr-FR',userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',viewport:{width:1366,height:800}});
  const p=await ctx.newPage();
  p.on('response',async r=>{ if(/auth|login|getuser/i.test(r.url())&&r.request().method()==='POST'){ let t='';try{t=(await r.text()).slice(0,400)}catch{} console.log('RESP',r.status(),r.url(),t);} });
- await p.goto('https://megapari.africa/fr',{waitUntil:'domcontentloaded',timeout:60000});
+ for(const u of ['https://megapari.com/fr','https://megapari.com/en','https://megapari.africa/en']){try{await p.goto(u,{waitUntil:'domcontentloaded',timeout:40000});await p.waitForTimeout(6000);console.log('TRY',u,'->',p.url());if(!/block/.test(p.url()))break;}catch(e){console.log('TRYERR',u,e.message.slice(0,80))}}
  await p.waitForTimeout(10000);
  console.log('URL',p.url(),'TITLE',await p.title());
  const els=await p.$$eval('button,a',n=>n.filter(e=>e.offsetParent).map(e=>(e.innerText||'').trim()).filter(t=>t&&t.length<30).slice(0,40));
