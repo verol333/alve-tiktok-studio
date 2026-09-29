@@ -476,7 +476,7 @@ function drawFrame(ctx, env, tl, i, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     const r = look(ctx, env, s, lt, t) || {};
     if (r.phone) { if (s.seg) drawWalkPhone(ctx, env, s, lt, t, accentOf(s)); else phone(ctx, env, tl, i, t); }
-    if (r.subs) drawSubs(ctx, env, s, t, W / 2);
+    if (r.subs && !s.nosubs) drawSubs(ctx, env, s, t, W / 2);
     drawHud(ctx, env, s, t, r.light);
     finishFx(ctx, s, lt);
     return;
