@@ -5,6 +5,7 @@ import { writeFileSync, readdirSync } from 'node:fs';
 import { api } from './api.mjs';
 import { initScript } from './capture.mjs';
 import { run } from './sh.mjs';
+import { shootPhone } from './phone.mjs';
 
 const DIR = '/tmp/bc';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -19,7 +20,13 @@ async function main() {
   const page = await ctx.newPage();
   const tPage = Date.now();
   await page.goto('https://al-ve-pro.base44.app/BroadcastRender?v=' + variant, { waitUntil: 'networkidle', timeout: 90000 });
-  await page.waitForFunction(() => window.__wav, null, { timeout: 180000, polling: 500 });
+  await page.waitForFunction(() => window.__wav && window.__walk, null, { timeout: 180000, polling: 500 });
+  const walk = await page.evaluate(() => window.__walk);
+  if (walk.taps.length) {
+    const file = await shootPhone(browser, token, walk, DIR);
+    await ctx.route('**/__phone.webm', (r) => r.fulfill({ path: file, contentType: 'video/webm' }));
+    await page.evaluate(() => { window.__phoneUrl = '/__phone.webm'; });
+  }
   writeFileSync(DIR + '/mix.wav', Buffer.from(await page.evaluate(() => window.__wav), 'base64'));
   // Laisse le site du téléphone (préchargé) se charger avant de lancer.
   await wait(6000);
@@ -29,7 +36,7 @@ async function main() {
   await page.waitForFunction(() => window.__done, null, { timeout: 15 * 60000, polling: 1000 });
   await wait(800);
   await ctx.close(); await browser.close();
-  const raw = DIR + '/' + readdirSync(DIR).find((f) => f.endsWith('.webm'));
+  const raw = DIR + '/' + readdirSync(DIR).filter((f) => f !== 'phone.webm').find((f) => f.endsWith('.webm'));
   const offset = Math.max(0, (t0 - tPage) / 1000).toFixed(3);
   const scale = tall ? '1080:1920' : '1920:1080';
   await run('ffmpeg', ['-y', '-ss', offset, '-i', raw, '-i', DIR + '/mix.wav', '-map', '0:v', '-map', '1:a',
