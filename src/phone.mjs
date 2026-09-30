@@ -40,7 +40,7 @@ function press() {
 }
 
 export async function shootPhone(browser, token, walk, dir) {
-  const ctx = await browser.newContext({ viewport: { width: 430, height: H }, deviceScaleFactor: 2, recordVideo: { dir: dir + '/phone', size: { width: 860, height: 1808 } } });
+  const ctx = await browser.newContext({ viewport: { width: 430, height: H }, deviceScaleFactor: 1, recordVideo: { dir: dir + '/phone', size: { width: 430, height: H } } });
   await ctx.addInitScript(initScript, token);
   const p = await ctx.newPage(); const tRec = Date.now();
   await p.goto('https://al-ve-pro.base44.app/', { waitUntil: 'networkidle', timeout: 90000 });
@@ -54,7 +54,8 @@ export async function shootPhone(browser, token, walk, dir) {
     if (tap.look) { await wait(tap.look * 1000); } else { await until(at(tap.at)); await p.evaluate(press).catch(() => {}); await wait(900); }
     await p.evaluate(() => document.querySelectorAll('.__hl').forEach((n) => n.remove())).catch(() => {});
   }
-  await wait(4000);
+  // On filme jusqu'à la fin des scènes du téléphone : l'analyse et les matchs trouvés restent à l'écran
+  await until(at((walk.end || 0) + 2));
   const vpath = await p.video().path();
   await ctx.close();
   const out = dir + '/phone.webm';
