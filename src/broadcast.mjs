@@ -5,7 +5,7 @@ import { writeFileSync, readdirSync } from 'node:fs';
 import { api } from './api.mjs';
 import { initScript } from './capture.mjs';
 import { run } from './sh.mjs';
-import { shootPhone } from './phone.mjs';
+import { shootPhone } from './shootPhone.mjs';
 
 const DIR = '/tmp/bc';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
