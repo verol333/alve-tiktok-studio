@@ -12,7 +12,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const { token, variant } = await api('access');
-  const tall = variant !== 'youtube';
+  const tall = !['youtube', 'strat4'].includes(variant);
   const size = tall ? { width: 720, height: 1280 } : { width: 1280, height: 720 };
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const ctx = await browser.newContext({ viewport: size, recordVideo: { dir: DIR, size } });
