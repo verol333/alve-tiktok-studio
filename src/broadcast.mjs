@@ -32,7 +32,7 @@ async function main() {
   // Laisse le site du téléphone (préchargé) se charger avant de lancer.
   await wait(6000);
   log('son prêt, lecture'); await page.evaluate(() => window.__go());
-  await page.waitForFunction(() => window.__bcT0, null, { timeout: 120000 });
+  await page.waitForFunction(() => window.__bcT0, null, { timeout: 300000 });
   const t0 = await page.evaluate(() => window.__bcT0);
   await page.waitForFunction(() => window.__done, null, { timeout: 45 * 60000, polling: 1000 }); log('tournage fini');
   await wait(800);
