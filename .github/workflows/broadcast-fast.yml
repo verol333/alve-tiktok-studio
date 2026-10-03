@@ -8,6 +8,9 @@ on:
         required: true
       api:
         required: true
+      variant:
+        required: false
+        default: ''
 permissions:
   contents: write
 jobs:
@@ -31,6 +34,7 @@ jobs:
           SCRIPT_ID: ${{ inputs.script_id }}
           JOB_TOKEN: ${{ inputs.token }}
           API_URL: ${{ inputs.api }}
+          VARIANT: ${{ inputs.variant }}
       - uses: actions/upload-artifact@v4
         with:
           name: prep
@@ -69,6 +73,7 @@ jobs:
           JOB_TOKEN: ${{ inputs.token }}
           API_URL: ${{ inputs.api }}
           SHARD: ${{ matrix.shard }}
+          VARIANT: ${{ inputs.variant }}
           SHARDS: 10
       - uses: actions/upload-artifact@v4
         with:
