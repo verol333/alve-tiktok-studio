@@ -6,12 +6,13 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { api } from './api.mjs';
 import { initScript } from './capture.mjs';
+const TALL = process.env.TALL === '1';
 const DIR = '/tmp/bc', S = +process.env.SHARD, N = +process.env.SHARDS, FPS = 30;
 async function main() {
   const meta = JSON.parse(readFileSync(DIR + '/meta.json', 'utf8'));
   const { token } = (process.env.VARIANT ? { token: '', variant: process.env.VARIANT } : await api('access'));
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5 });
+  const ctx = await browser.newContext({ viewport: TALL ? { width: 720, height: 1280 } : { width: 1280, height: 720 }, deviceScaleFactor: 1.5 });
   await ctx.addInitScript(initScript, token);
   const deck = {};
   for (const c of meta.deck) {
@@ -26,7 +27,7 @@ async function main() {
   const total = Math.ceil(meta.dur * FPS), a = Math.floor((total * S) / N), b = Math.floor((total * (S + 1)) / N);
   const out = DIR + '/part_' + String(S).padStart(2, '0') + '.mp4';
   const ff = spawn('ffmpeg', ['-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-    '-vf', 'scale=1920:1080:flags=lanczos,format=yuv420p', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-r', String(FPS), '-profile:v', 'high', out], { stdio: ['pipe', 'ignore', 'inherit'] });
+    '-vf', (TALL ? 'scale=1080:1920' : 'scale=1920:1080') + ':flags=lanczos,format=yuv420p', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-r', String(FPS), '-profile:v', 'high', out], { stdio: ['pipe', 'ignore', 'inherit'] });
   const t0 = Date.now();
   for (let f = a; f < b; f++) {
     await page.evaluate((t) => window.__seek(t), f / FPS);
