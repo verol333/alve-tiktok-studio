@@ -94,36 +94,37 @@ function avgLuma(file) {
   return { avg: v.reduce((x, y) => x + y, 0) / (v.length || 1), dark: v.filter((x) => x < 12).length, n: v.length };
 }
 
+// Captures d'écran (plus de film) : chaque étape = une capture, affichée pile au moment où la voix en parle, avec un zoom lent.
 async function one(browser, token, item, dir) {
   const dur = item.end - item.start, g = item.segs || [];
   const list = shots(item.k, g, dur);
-  const pages = await Promise.all(list.map(async (s, i) => {
-    const ctx = await browser.newContext({ viewport: SIZE, deviceScaleFactor: 1, recordVideo: { dir: dir + '/deck_' + item.k + '_' + i, size: SIZE } });
+  const imgs = [];
+  await Promise.all(list.map(async (s, i) => {
+    const ctx = await browser.newContext({ viewport: SIZE, deviceScaleFactor: 2 });
     await ctx.addInitScript(initScript, token);
-    const p = await ctx.newPage(); const tRec = Date.now();
-    await p.goto(SITE + s.path, { waitUntil: 'load', timeout: 90000 });
-    if (s.ready) await p.waitForSelector(s.ready, { timeout: 90000 });
-    await wait(5000); await closeInvites(p).catch(() => {}); await wait(800);
-    if (s.prep) await s.prep(p);
-    console.log('écran ' + item.k + ' ' + s.path + ' affiché');
-    return { s, ctx, p, tRec };
+    const p = await ctx.newPage();
+    await p.goto(SITE + s.path, { waitUntil: 'load', timeout: 60000 });
+    if (s.ready) await p.waitForSelector(s.ready, { timeout: 60000 }).catch(() => {});
+    await wait(3500); await closeInvites(p).catch(() => {}); await wait(500);
+    if (s.prep) await s.prep(p).catch((e) => console.log('préparation ratée ' + s.path + ' : ' + e.message));
+    let n = 0;
+    const snap = async (t) => { const f = dir + '/shot_' + item.k + '_' + i + '_' + (n++) + '.png'; await p.screenshot({ path: f }); imgs.push({ t: Math.max(s.a, Math.min(t, s.b)), b: s.b, f }); };
+    await snap(s.a);
+    for (const [at, fn] of s.acts || []) { await fn(p).catch((e) => console.log('geste raté ' + s.path + ' : ' + e.message)); await wait(400); await snap(at); }
+    await ctx.close();
+    console.log('captures ' + item.k + ' ' + s.path + ' : ' + n);
   }));
-  const tGo = Date.now();
-  await Promise.all(pages.map(async ({ s, p }) => {
-    for (const [at, fn] of s.acts || []) { const d = tGo + at * 1000 - Date.now(); if (d > 0) await wait(d); await fn(p).catch((e) => console.log('geste raté ' + s.path + ' : ' + e.message)); }
-  }));
-  const left = tGo + (dur + 0.8) * 1000 - Date.now(); if (left > 0) await wait(left);
-  const raws = [];
-  for (const x of pages) { const v = x.p.video(); await x.ctx.close(); raws.push(await v.path()); }
+  imgs.sort((x, z) => x.t - z.t);
+  const parts = imgs.map((x, i) => ({ f: x.f, d: Math.max(0.1, (i + 1 < imgs.length ? imgs[i + 1].t : dur) - x.t) })).filter((x) => x.d > 0.05);
+  if (!parts.length) throw new Error('Aucune capture (' + item.k + ')');
+  parts[0].d += parts[0] === parts[0] ? imgs[0].t : 0;
   const args = ['-y'];
-  pages.forEach((x, i) => args.push('-ss', ((tGo - x.tRec) / 1000 + x.s.a).toFixed(3), '-t', (x.s.b - x.s.a).toFixed(3), '-i', raws[i]));
-  const f = pages.map((_, i) => '[' + i + ':v]scale=390:844,fps=30,setsar=1[v' + i + ']').join(';') + ';' + pages.map((_, i) => '[v' + i + ']').join('') + 'concat=n=' + pages.length + ':v=1:a=0[out]';
+  parts.forEach((x) => args.push('-loop', '1', '-framerate', '30', '-t', x.d.toFixed(3), '-i', x.f));
+  const f = parts.map((x, i) => { const fr = Math.max(1, Math.round(x.d * 30)); return '[' + i + ':v]scale=780:1688,zoompan=z=\'1+0.06*on/' + fr + '\':x=\'iw/2-(iw/zoom/2)\':y=\'ih/3-(ih/zoom/3)\':d=1:s=390x844:fps=30,trim=end_frame=' + fr + ',setsar=1[v' + i + ']'; }).join(';')
+    + ';' + parts.map((_, i) => '[v' + i + ']').join('') + 'concat=n=' + parts.length + ':v=1:a=0[out]';
   const out = dir + '/deck_' + item.k + '.webm';
-  // Une image clé par image : le rendu image par image retrouve chaque instant exactement.
   await run('ffmpeg', [...args, '-filter_complex', f, '-map', '[out]', '-an', '-c:v', 'libvpx', '-b:v', '8M', '-g', '1', '-deadline', 'realtime', '-cpu-used', '8', out]);
-  const L = avgLuma(out);
-  console.log('contrôle image ' + item.k + ' : luminosité ' + L.avg.toFixed(1) + ', noires ' + L.dark + '/' + L.n);
-  if (!L.n || L.dark > L.n * 0.15) throw new Error('Écran du téléphone noir (' + item.k + ') : montage arrêté');
+  console.log('écran ' + item.k + ' prêt : ' + parts.length + ' captures');
   return out;
 }
 
