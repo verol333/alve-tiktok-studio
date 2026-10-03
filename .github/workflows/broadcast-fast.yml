@@ -117,7 +117,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node --input-type=module -e "import { api } from './src/api.mjs'; await api('fail', { error: 'Montage interrompu sur une machine du studio' });"
+      - run: |
+          node --input-type=module -e "import { api } from './src/api.mjs'; await api('fail', { error: 'Montage interrompu sur une machine du studio' });"
         env:
           SCRIPT_ID: ${{ inputs.script_id }}
           JOB_TOKEN: ${{ inputs.token }}
