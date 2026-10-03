@@ -6,7 +6,7 @@ import { initScript } from './capture.mjs';
 import { shootDeck } from './shootDeck.mjs';
 const DIR = '/tmp/bc'; mkdirSync(DIR, { recursive: true });
 async function main() {
-  const { token, variant } = await api('access');
+  const { token, variant } = (process.env.VARIANT ? { token: '', variant: process.env.VARIANT } : await api('access'));
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   await ctx.addInitScript(initScript, token);
