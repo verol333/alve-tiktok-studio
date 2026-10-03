@@ -1,0 +1,124 @@
+name: broadcast-fast
+on:
+  workflow_dispatch:
+    inputs:
+      script_id:
+        required: true
+      token:
+        required: true
+      api:
+        required: true
+permissions:
+  contents: write
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Masquer le jeton
+        run: echo "::add-mask::${{ inputs.token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-noto-color-emoji > /dev/null
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium > /dev/null
+      - name: Son et écrans du téléphone
+        run: node src/bcPrep.mjs
+        env:
+          SCRIPT_ID: ${{ inputs.script_id }}
+          JOB_TOKEN: ${{ inputs.token }}
+          API_URL: ${{ inputs.api }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prep
+          retention-days: 1
+          path: |
+            /tmp/bc/mix.wav
+            /tmp/bc/meta.json
+            /tmp/bc/deck_*.webm
+  shard:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - name: Masquer le jeton
+        run: echo "::add-mask::${{ inputs.token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-noto-color-emoji > /dev/null
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium > /dev/null
+      - uses: actions/download-artifact@v4
+        with:
+          name: prep
+          path: /tmp/bc
+      - name: Tranche
+        run: node src/bcShard.mjs
+        env:
+          SCRIPT_ID: ${{ inputs.script_id }}
+          JOB_TOKEN: ${{ inputs.token }}
+          API_URL: ${{ inputs.api }}
+          SHARD: ${{ matrix.shard }}
+          SHARDS: 10
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part-${{ matrix.shard }}
+          retention-days: 1
+          path: /tmp/bc/part_*.mp4
+  join:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Masquer le jeton
+        run: echo "::add-mask::${{ inputs.token }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-noto-color-emoji > /dev/null
+      - run: npm install --no-audit --no-fund
+      - uses: actions/download-artifact@v4
+        with:
+          name: prep
+          path: /tmp/bc
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          merge-multiple: true
+          path: /tmp/bc/parts
+      - name: Assemblage
+        run: node src/bcJoin.mjs
+        env:
+          SCRIPT_ID: ${{ inputs.script_id }}
+          JOB_TOKEN: ${{ inputs.token }}
+          API_URL: ${{ inputs.api }}
+          SHARDS: 10
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+  fail:
+    needs: [prep, shard, join]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --input-type=module -e "import { api } from './src/api.mjs'; await api('fail', { error: 'Montage interrompu sur une machine du studio' });"
+        env:
+          SCRIPT_ID: ${{ inputs.script_id }}
+          JOB_TOKEN: ${{ inputs.token }}
+          API_URL: ${{ inputs.api }}
