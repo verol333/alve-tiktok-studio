@@ -9,7 +9,7 @@ import { initScript } from './capture.mjs';
 const DIR = '/tmp/bc', S = +process.env.SHARD, N = +process.env.SHARDS, FPS = 30;
 async function main() {
   const meta = JSON.parse(readFileSync(DIR + '/meta.json', 'utf8'));
-  const { token } = await api('access');
+  const { token } = (process.env.VARIANT ? { token: '', variant: process.env.VARIANT } : await api('access'));
   const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5 });
   await ctx.addInitScript(initScript, token);
